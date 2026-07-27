@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Smoothie Generator</title>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -23,479 +24,362 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    /* ─── CREDENTIALS (hardcoded) ─── */
-    const ANTHROPIC_KEY = localStorage.getItem("sg-api-key") || "sk-ant-api03-nm3YkqZRSq4xT9OsritXfKYpy25NS5Omw2frlzv-FA46GUfj3anlK4qh0LwLjx_-JV5cbwAA";
+    const ANTHROPIC_KEY = localStorage.getItem("sg-api-key") || "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";
     const SB_URL        = "https://ivljukkwuttjdzxzygbt.supabase.co";
     const SB_ANON_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2bGp1a2t3dXR0amR6eHp5Z2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjEyODUsImV4cCI6MjEwMDEzNzI4NX0.yBvPBobTsfjm6_JlG49dMjYKOzgKCKIAmMWq8i1JBV8";
 
-    /* ─── SUPABASE CLIENT ─── */
     let _client = null;
-    const getClient = () => {
-      if (_client) return _client;
-      _client = supabase.createClient(SB_URL, SB_ANON_KEY);
-      return _client;
-    };
-
+    const getClient = () => { if (_client) return _client; _client = supabase.createClient(SB_URL, SB_ANON_KEY); return _client; };
     const db = {
-      get: async (key) => {
-        const c = getClient(); if (!c) return null;
-        try {
-          const { data } = await c.from("smoothie_store").select("value").eq("key", key).maybeSingle();
-          return data?.value ?? null;
-        } catch { return null; }
-      },
-      set: async (key, val) => {
-        const c = getClient(); if (!c) return;
-        try {
-          await c.from("smoothie_store").upsert({ key, value: val, updated_at: new Date().toISOString() }, { onConflict: "key" });
-        } catch {}
-      },
+      get: async (key) => { try { const { data } = await getClient().from("smoothie_store").select("value").eq("key", key).maybeSingle(); return data?.value ?? null; } catch { return null; } },
+      set: async (key, val) => { try { await getClient().from("smoothie_store").upsert({ key, value: val, updated_at: new Date().toISOString() }, { onConflict: "key" }); } catch {} },
     };
 
-    /* ─── DATABASE ─── */
     const DB = {
-      "Bases": [
-        { id: "coconut_milk",  name: "Coconut Milk",           emoji: "🥥" },
-        { id: "coconut_water", name: "Coconut Water",          emoji: "💧" },
-        { id: "oat_milk",      name: "Oat Milk",               emoji: "🥛" },
-      ],
-      "Proteins": [
-        { id: "greek_yogurt",  name: "Greek Yogurt",           emoji: "🫙" },
-        { id: "choc_protein",  name: "Chocolate Protein",      emoji: "🍫" },
-        { id: "van_protein",   name: "Vanilla Protein",        emoji: "✨" },
-      ],
-      "Fruits": [
-        { id: "banana",        name: "Banana",                 emoji: "🍌" },
-        { id: "avocado",       name: "Avocado",                emoji: "🥑" },
-        { id: "mixed_berries", name: "Mixed Berries (frozen)", emoji: "🫐" },
-        { id: "blueberries",   name: "Blueberries (frozen)",   emoji: "🔵" },
-        { id: "raspberries",   name: "Raspberries (frozen)",   emoji: "🍇" },
-        { id: "strawberries",  name: "Strawberries (frozen)",  emoji: "🍓" },
-        { id: "pineapple",     name: "Pineapple (frozen)",     emoji: "🍍" },
-        { id: "mango",         name: "Mango (frozen)",         emoji: "🥭" },
-      ],
-      "Vegetables": [
-        { id: "spinach",       name: "Spinach",                emoji: "🥬" },
-        { id: "kale",          name: "Kale",                   emoji: "🥬" },
-        { id: "carrots",       name: "Carrots",                emoji: "🥕" },
-      ],
-      "Nuts & Seeds": [
-        { id: "peanut_butter", name: "Peanut Butter",          emoji: "🥜" },
-        { id: "almond_butter", name: "Almond Butter",          emoji: "🌰" },
-        { id: "chia_seeds",    name: "Chia Seeds",             emoji: "⚫" },
-        { id: "flaxseed",      name: "Flaxseed",               emoji: "🟤" },
-      ],
-      "Sweeteners": [
-        { id: "honey",         name: "Honey",                  emoji: "🍯" },
-      ],
-      "Spices": [
-        { id: "ginger",        name: "Ginger",                 emoji: "🫚" },
-        { id: "cinnamon",      name: "Cinnamon",               emoji: "🟫" },
-        { id: "turmeric",      name: "Turmeric",               emoji: "🟡" },
-        { id: "cardamom",      name: "Cardamom",               emoji: "🌿" },
-        { id: "nutmeg",        name: "Nutmeg",                 emoji: "🌰" },
-        { id: "cayenne",       name: "Cayenne",                emoji: "🌶️" },
-        { id: "black_pepper",  name: "Black Pepper",           emoji: "⚫" },
-        { id: "vanilla_ext",   name: "Vanilla Extract",        emoji: "🤍" },
-        { id: "cloves",        name: "Cloves",                 emoji: "🫙" },
-        { id: "allspice",      name: "Allspice",               emoji: "🟤" },
-      ],
+      "Bases":    [ { id:"coconut_milk", name:"Coconut Milk", emoji:"🥥" }, { id:"coconut_water", name:"Coconut Water", emoji:"💧" }, { id:"oat_milk", name:"Oat Milk", emoji:"🥛" } ],
+      "Proteins": [ { id:"greek_yogurt", name:"Greek Yogurt", emoji:"🫙" }, { id:"choc_protein", name:"Chocolate Protein", emoji:"🍫" }, { id:"van_protein", name:"Vanilla Protein", emoji:"✨" } ],
+      "Fruits":   [ { id:"banana", name:"Banana", emoji:"🍌" }, { id:"avocado", name:"Avocado", emoji:"🥑" }, { id:"mixed_berries", name:"Mixed Berries", emoji:"🫐" }, { id:"blueberries", name:"Blueberries", emoji:"🔵" }, { id:"raspberries", name:"Raspberries", emoji:"🍇" }, { id:"strawberries", name:"Strawberries", emoji:"🍓" }, { id:"pineapple", name:"Pineapple", emoji:"🍍" }, { id:"mango", name:"Mango", emoji:"🥭" } ],
+      "Vegetables": [ { id:"spinach", name:"Spinach", emoji:"🥬" }, { id:"kale", name:"Kale", emoji:"🥬" }, { id:"carrots", name:"Carrots", emoji:"🥕" } ],
+      "Nuts, Seeds & Sweeteners": [ { id:"peanut_butter", name:"Peanut Butter", emoji:"🥜" }, { id:"almond_butter", name:"Almond Butter", emoji:"🌰" }, { id:"chia_seeds", name:"Chia Seeds", emoji:"⚫" }, { id:"flaxseed", name:"Flaxseed", emoji:"🟤" }, { id:"honey", name:"Honey", emoji:"🍯" } ],
+      "Spices":   [ { id:"ginger", name:"Ginger", emoji:"🫚" }, { id:"cinnamon", name:"Cinnamon", emoji:"🟫" }, { id:"turmeric", name:"Turmeric", emoji:"🟡" }, { id:"cardamom", name:"Cardamom", emoji:"🌿" }, { id:"nutmeg", name:"Nutmeg", emoji:"🌰" }, { id:"cayenne", name:"Cayenne", emoji:"🌶️" }, { id:"black_pepper", name:"Black Pepper", emoji:"⚫" }, { id:"vanilla_ext", name:"Vanilla Extract", emoji:"🤍" }, { id:"cloves", name:"Cloves", emoji:"🫙" }, { id:"allspice", name:"Allspice", emoji:"🟤" } ],
     };
 
-    const PRESET_SUGS = [
-      { id: "preset_maca",   item: "Maca Powder",   acquired: false, reason: "Earthy, malty adaptogen. Great with banana, nut butters, and chocolate protein." },
-      { id: "preset_matcha", item: "Matcha Powder", acquired: false, reason: "Grassy umami with natural caffeine. Pairs well with coconut milk, mango, and honey." },
-      { id: "preset_cacao",  item: "Cacao Powder",  acquired: false, reason: "Raw chocolate with more antioxidants than cocoa. Works with almost anything." },
-    ];
+    const ALL_ING    = Object.values(DB).flat();
+    const CREATE_ROWS = [ ["Bases","Proteins","Fruits"], ["Vegetables","Nuts, Seeds & Sweeteners","Spices"] ];
 
-    const ALL_ING = Object.values(DB).flat();
-
-    /* ─── HELPERS ─── */
-    const fmtRatio = (r) => {
-      const n = Number(r);
-      if (n === 0.25) return "¼"; if (n >= 0.32 && n <= 0.34) return "⅓";
-      if (n === 0.5)  return "½"; if (n >= 0.65 && n <= 0.68) return "⅔";
-      if (n === 0.75) return "¾"; if (Number.isInteger(n)) return String(n);
-      return n.toFixed(1);
+    const BAR_COLORS = {
+      "Bases":                    "#1B4B8A",
+      "Proteins":                 "#6B3FA0",
+      "Fruits":                   "#E8642A",
+      "Vegetables":               "#2D7D4F",
+      "Nuts, Seeds & Sweeteners": "#B87820",
+      "Spices":                   "#C24040",
     };
 
-    const fmtDate = (ts) => {
-      if (!ts) return "";
-      const d = new Date(ts), now = new Date();
-      const today   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const itemDay = new Date(d.getFullYear(),   d.getMonth(),   d.getDate());
-      const diff    = Math.round((today - itemDay) / 86400000);
-      if (diff === 0) return `Today · ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-      if (diff === 1) return "Yesterday";
-      if (diff < 7)  return `${diff} days ago`;
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    };
+    const fmtRatio = (r) => { const n=Number(r); if(n===0.25)return"¼"; if(n>=0.32&&n<=0.34)return"⅓"; if(n===0.5)return"½"; if(n>=0.65&&n<=0.68)return"⅔"; if(n===0.75)return"¾"; if(Number.isInteger(n))return String(n); return n.toFixed(1); };
+    const fmtDate  = (ts) => { if(!ts)return""; const d=new Date(ts),now=new Date(); const today=new Date(now.getFullYear(),now.getMonth(),now.getDate()); const itemDay=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const diff=Math.round((today-itemDay)/86400000); if(diff===0)return`Today · ${d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`; if(diff===1)return"Yesterday"; if(diff<7)return`${diff} days ago`; return d.toLocaleDateString("en-US",{month:"short",day:"numeric"}); };
 
     const buildList = (off, custom) =>
       Object.entries(DB).map(([cat, items]) => {
-        const customInCat = (custom || []).filter(c => c.category === cat);
-        const avail = [...items, ...customInCat].filter(i => !off.includes(i.id));
-        return avail.length ? `${cat}: ${avail.map(i => i.name).join(", ")}` : null;
+        const customInCat = (custom||[]).filter(c=>c.category===cat);
+        const avail = [...items,...customInCat].filter(i=>!off.includes(i.id));
+        return avail.length ? `${cat}: ${avail.map(i=>i.name).join(", ")}` : null;
       }).filter(Boolean).join("\n");
 
-    const SYS = `You are a creative smoothie chef making unique, genuinely delicious blends.
-Use ONLY ingredients from the provided available list. Return ONLY valid JSON — no markdown, no preamble:
+    const SYS = `You are a smoothie recipe generator. Use ONLY ingredients from the provided list.
+Return ONLY valid JSON — no markdown, no extra text:
 {
-  "name": "Evocative 2-4 word name",
-  "tagline": "One sentence capturing the vibe",
+  "name": "2-4 word name",
+  "tagline": "One sentence on the key flavors — plain language, no metaphors or filler adjectives",
+  "icons": ["emoji1", "emoji2", "emoji3"],
   "needsIce": false,
-  "base": [{"item": "exact ingredient name", "ratio": 2}],
-  "fruits": [{"item": "exact ingredient name", "ratio": 1}],
-  "proteins": [{"item": "exact ingredient name", "ratio": 1}],
-  "extras": [{"item": "exact ingredient name", "ratio": 0.5}],
-  "spices": [{"item": "exact ingredient name", "ratio": 1}],
-  "notes": "One prep or serving tip",
-  "suggestion": {"item": "New ingredient not in pantry", "reason": "One sentence why it works"}
+  "notes": "One practical prep tip",
+  "bases": [{"item": "exact name", "ratio": 2}],
+  "proteins": [{"item": "exact name", "ratio": 1}],
+  "fruits": [{"item": "exact name", "ratio": 1}],
+  "vegetables": [{"item": "exact name", "ratio": 0.5}],
+  "nuts_seeds_sweeteners": [{"item": "exact name", "ratio": 0.5}],
+  "spices": [{"item": "exact name", "ratio": 1}]
 }
 Rules:
-- base=liquids; fruits=fruit+veg; proteins=protein powder/yogurt; extras=nut butters+seeds+honey; spices=optional
-- REQUIRED: proteins must always include Chocolate Protein, Vanilla Protein, or Greek Yogurt
-- needsIce: true if little/no frozen fruit. False if 2+ frozen fruits at meaningful ratios.
-- Ratios are relative within each category. Do NOT repeat smoothies from history.
-- Suggestion must be a new ingredient not already in the pantry. Make it taste great.`;
+- bases=liquids; proteins=protein powder/yogurt; fruits=all fruit; vegetables=all veg; nuts_seeds_sweeteners=nut butters+seeds+honey; spices=optional
+- proteins MUST always include Chocolate Protein, Vanilla Protein, or Greek Yogurt
+- vegetables and nuts_seeds_sweeteners may be empty arrays [] if not used
+- icons: 3 emojis that best represent the most distinctive flavors/ingredients in this specific recipe
+- needsIce: true if little or no frozen fruit — won't be cold or thick enough without it
+- Ratios are relative within each category. Do NOT repeat smoothies from history. Make it taste good.`;
 
-    const C = {
-      bg:"#F8F4ED", dark:"#1A3028", accent:"#E8642A", card:"#FFFFFF",
-      muted:"#8A8A7A", light:"#9DC5AA", border:"#E6E0D4",
-      green:"#EDF6F1", tag:"#FEF0E7", ice:"#EBF4FF", iceText:"#1A5F8A",
-    };
+    const C = { bg:"#F8F4ED", dark:"#1A3028", accent:"#E8642A", card:"#FFFFFF", muted:"#8A8A7A", light:"#9DC5AA", border:"#E6E0D4", green:"#EDF6F1", ice:"#EBF4FF", iceText:"#1A5F8A" };
 
-    /* ─── RATIO SECTION ─── */
     function RatioSection({ items, label, barColor }) {
       if (!items?.length) return null;
-      const max = Math.max(...items.map(i => Number(i.ratio) || 1));
-      const isSpice = label === "Spices";
+      const max = Math.max(...items.map(i=>Number(i.ratio)||1));
+      const isSpice = label==="Spices";
       return (
-        <div style={{ marginTop: "14px" }}>
-          <div style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "1.2px", textTransform: "uppercase", color: C.accent, marginBottom: "8px" }}>{label}</div>
-          {items.map((item, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 0", borderBottom: `1px solid ${C.border}` }}>
-              <div style={{ height: "5px", width: `${Math.max(10, (Number(item.ratio) / max) * 72)}px`, background: barColor || C.dark, borderRadius: "3px", flexShrink: 0 }} />
-              <span style={{ fontSize: "14px", flex: 1 }}>{item.item}</span>
-              <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>
-                {fmtRatio(item.ratio)}&thinsp;{isSpice ? (Number(item.ratio) === 1 ? "pinch" : "pinches") : (Number(item.ratio) === 1 ? "part" : "parts")}
-              </span>
+        <div style={{marginTop:"14px"}}>
+          <div style={{fontSize:"10px",fontWeight:"700",letterSpacing:"1.2px",textTransform:"uppercase",color:barColor||C.dark,marginBottom:"8px",opacity:0.85}}>{label}</div>
+          {items.map((item,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <div style={{height:"5px",width:`${Math.max(10,(Number(item.ratio)/max)*72)}px`,background:barColor||C.dark,borderRadius:"3px",flexShrink:0}}/>
+              <span style={{fontSize:"14px",flex:1}}>{item.item}</span>
+              <span style={{fontSize:"11px",color:C.muted,fontWeight:"600"}}>{fmtRatio(item.ratio)}&thinsp;{isSpice?(Number(item.ratio)===1?"pinch":"pinches"):(Number(item.ratio)===1?"part":"parts")}</span>
             </div>
           ))}
         </div>
       );
     }
 
-    /* ─── RECIPE CARD ─── */
-    function RecipeCard({ r, onSave, saveLabel = "Save to Favorites", onRegenerate, onDelete }) {
+    function RecipeCard({ r, onSave, saveLabel="Save to Favorites", onRegenerate, onDelete }) {
+      // backward compat with old recipe format
+      const bases  = r.bases  || r.base  || [];
+      const fruits = r.fruits || [];
+      const vegs   = r.vegetables || [];
+      const nuts   = r.nuts_seeds_sweeteners || r.extras || [];
+      const prots  = r.proteins || [];
+      const spices = r.spices || [];
       return (
         <div>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "24px", fontWeight: "700", color: C.dark, lineHeight: 1.2 }}>{r.name}</div>
-          <div style={{ fontSize: "13px", color: C.muted, fontStyle: "italic", marginTop: "4px" }}>{r.tagline}</div>
-          {r.needsIce && (
-            <div style={{ display: "flex", alignItems: "center", gap: "9px", background: C.ice, borderRadius: "9px", padding: "9px 13px", fontSize: "13px", color: C.iceText, marginTop: "12px", fontWeight: "500" }}>
-              <span style={{ fontSize: "18px", flexShrink: 0 }}>🧊</span>
-              <span>Add ~1 cup of ice — not much frozen fruit here.</span>
-            </div>
-          )}
-          <RatioSection items={r.base}     label="Base" />
-          <RatioSection items={r.fruits}   label="Fruits & Veg" />
-          <RatioSection items={r.proteins} label="Proteins" />
-          <RatioSection items={r.extras}   label="Extras" />
-          <RatioSection items={r.spices}   label="Spices" barColor={C.accent} />
-          {r.notes && (
-            <div style={{ background: C.green, borderRadius: "8px", padding: "10px 13px", fontSize: "13px", color: "#2D5E42", marginTop: "14px", lineHeight: 1.5 }}>💡 {r.notes}</div>
-          )}
-          <div style={{ display: "flex", gap: "10px", marginTop: "16px", flexWrap: "wrap" }}>
-            {onSave && <button onClick={onSave} style={{ flex: 1, minWidth: "120px", background: saveLabel.includes("✓") ? C.dark : C.accent, color: "#FFF", border: "none", borderRadius: "10px", padding: "11px 16px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>{saveLabel}</button>}
-            {onRegenerate && <button onClick={onRegenerate} style={{ background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`, borderRadius: "10px", padding: "11px 14px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Regenerate</button>}
-            {onDelete && <button onClick={onDelete} style={{ background: "transparent", color: "#B03A2E", border: "1.5px solid #B03A2E", borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Remove</button>}
+          <div style={{fontFamily:"'Playfair Display', serif",fontSize:"24px",fontWeight:"700",color:C.dark,lineHeight:1.2}}>{r.name}</div>
+          <div style={{fontSize:"13px",color:C.muted,marginTop:"4px"}}>{r.tagline}</div>
+          {r.needsIce&&<div style={{display:"flex",alignItems:"center",gap:"9px",background:C.ice,borderRadius:"9px",padding:"9px 13px",fontSize:"13px",color:C.iceText,marginTop:"12px",fontWeight:"500"}}><span style={{fontSize:"18px",flexShrink:0}}>🧊</span><span>Add ~1 cup of ice — not much frozen fruit in this one.</span></div>}
+          {r.notes&&<div style={{background:C.green,borderRadius:"8px",padding:"10px 13px",fontSize:"13px",color:"#2D5E42",marginTop:"12px",lineHeight:1.5}}>💡 {r.notes}</div>}
+          <RatioSection items={bases}  label="Bases"                    barColor={BAR_COLORS["Bases"]}/>
+          <RatioSection items={prots}  label="Proteins"                 barColor={BAR_COLORS["Proteins"]}/>
+          <RatioSection items={fruits} label="Fruits"                   barColor={BAR_COLORS["Fruits"]}/>
+          <RatioSection items={vegs}   label="Vegetables"               barColor={BAR_COLORS["Vegetables"]}/>
+          <RatioSection items={nuts}   label="Nuts, Seeds & Sweeteners" barColor={BAR_COLORS["Nuts, Seeds & Sweeteners"]}/>
+          <RatioSection items={spices} label="Spices"                   barColor={BAR_COLORS["Spices"]}/>
+          <div style={{display:"flex",gap:"10px",marginTop:"16px",flexWrap:"wrap"}}>
+            {onSave&&<button onClick={onSave} style={{flex:1,minWidth:"120px",background:saveLabel.includes("✓")?C.dark:C.accent,color:"#FFF",border:"none",borderRadius:"10px",padding:"11px 16px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>{saveLabel}</button>}
+            {onRegenerate&&<button onClick={onRegenerate} style={{background:"transparent",color:C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"10px",padding:"11px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Regenerate</button>}
+            {onDelete&&<button onClick={onDelete} style={{background:"transparent",color:"#B03A2E",border:"1.5px solid #B03A2E",borderRadius:"10px",padding:"8px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Remove</button>}
           </div>
         </div>
       );
     }
 
-        /* ─── LOADING SCREEN ─── */
     function LoadingScreen() {
-      return (
-        <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
-          <div style={{ textAlign: "center", color: C.muted }}>
-            <div style={{ fontSize: "36px", marginBottom: "12px" }}>🥤</div>
-            <div style={{ fontSize: "14px" }}>Loading your pantry…</div>
-          </div>
-        </div>
-      );
+      return <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans', sans-serif"}}><div style={{textAlign:"center",color:C.muted}}><div style={{fontSize:"36px",marginBottom:"12px"}}>🥤</div><div style={{fontSize:"14px"}}>Loading…</div></div></div>;
     }
 
-    /* ─── MAIN APP ─── */
     function SmoothieGenerator() {
-      const [setupDone,  setSetupDone]  = useState(true);
-      const [dbLoading,  setDbLoading]  = useState(true);
-      const [tab,        setTab]        = useState("create");
-      const [prompt,     setPrompt]     = useState("");
-      const [off,        setOff]        = useState([]);
-      const [custom,     setCustom]     = useState([]);
-      const [loading,    setLoading]    = useState(false);
-      const [recipe,     setRecipe]     = useState(null);
-      const [err,        setErr]        = useState(null);
-      const [favs,       setFavs]       = useState([]);
-      const [hist,       setHist]       = useState([]);
-      const [sugs,       setSugs]       = useState([]);
-      const [favSubTab,  setFavSubTab]  = useState("saved");
-      const [viewing,    setViewing]    = useState(null);
-      const [justSaved,  setJustSaved]  = useState(false);
-      const [showAddIng, setShowAddIng] = useState(false);
-      const [newIngName, setNewIngName] = useState("");
-      const [newIngCat,  setNewIngCat]  = useState("Fruits");
+      const [dbLoading,    setDbLoading]    = useState(true);
+      const [tab,          setTab]          = useState("create");
+      const [createStep,   setCreateStep]   = useState(1);
+      const [prompt,       setPrompt]       = useState("");
+      const [off,          setOff]          = useState([]);
+      const [custom,       setCustom]       = useState([]);
+      const [loading,      setLoading]      = useState(false);
+      const [recipe,       setRecipe]       = useState(null);
+      const [err,          setErr]          = useState(null);
+      const [favs,         setFavs]         = useState([]);
+      const [hist,         setHist]         = useState([]);
+      const [viewing,      setViewing]      = useState(null);
+      const [viewingFrom,  setViewingFrom]  = useState(null);
+      const [justSaved,    setJustSaved]    = useState(false);
+      const [showAddIng,   setShowAddIng]   = useState(false);
+      const [newIngName,   setNewIngName]   = useState("");
+      const [newIngCat,    setNewIngCat]    = useState("Fruits");
       const [showSettings, setShowSettings] = useState(false);
 
-      useEffect(() => {
-        if (!setupDone) return;
-        (async () => {
-          setDbLoading(true);
-          const [loadedFavs, loadedHist, loadedSugs, loadedOff, loadedCustom] = await Promise.all([
-            db.get("sl-favs"), db.get("sl-hist-v2"), db.get("sl-sugs"),
-            db.get("sl-off"),  db.get("sl-custom"),
-          ]);
-          if (loadedFavs)   setFavs(loadedFavs);
-          if (loadedHist)   setHist(loadedHist);
-          if (loadedOff)    setOff(loadedOff);
-          if (loadedCustom) setCustom(loadedCustom);
-          const base = loadedSugs || [];
-          const missing = PRESET_SUGS.filter(p => !base.some(s => s.item.toLowerCase() === p.item.toLowerCase()));
-          const merged = [...missing, ...base];
-          setSugs(merged);
-          if (missing.length) await db.set("sl-sugs", merged);
+      useEffect(()=>{
+        (async()=>{
+          const [lFavs,lHist,lOff,lCustom]=await Promise.all([db.get("sl-favs"),db.get("sl-hist-v2"),db.get("sl-off"),db.get("sl-custom")]);
+          if(lFavs)   setFavs(lFavs);
+          if(lHist)   setHist(lHist);
+          if(lOff)    setOff(lOff);
+          if(lCustom) setCustom(lCustom);
           setDbLoading(false);
         })();
-      }, [setupDone]);
+      },[]);
 
+      if(dbLoading) return <LoadingScreen/>;
 
-      if (dbLoading)  return <LoadingScreen />;
+      const persist = async(key,val)=>db.set(key,val);
 
-      const persist = async (key, val) => db.set(key, val);
+      const toggleOff = async(id)=>{ const next=off.includes(id)?off.filter(x=>x!==id):[...off,id]; setOff(next); await persist("sl-off",next); };
+      const clearOff  = async()=>{ setOff([]); await persist("sl-off",[]); };
+      const addCustomIng = async()=>{ const name=newIngName.trim(); if(!name)return; const ing={id:`custom_${Date.now()}`,name,emoji:"🌱",category:newIngCat}; const next=[...custom,ing]; setCustom(next); await persist("sl-custom",next); setNewIngName(""); setShowAddIng(false); };
+      const removeCustom = async(id)=>{ const next=custom.filter(c=>c.id!==id); setCustom(next); await persist("sl-custom",next); };
 
-      /* ─── PANTRY ─── */
-      const toggleOff = async (id) => {
-        const next = off.includes(id) ? off.filter(x => x !== id) : [...off, id];
-        setOff(next); await persist("sl-off", next);
-      };
-      const clearOff = async () => { setOff([]); await persist("sl-off", []); };
-
-      const addCustomIng = async () => {
-        const name = newIngName.trim(); if (!name) return;
-        const ing  = { id: `custom_${Date.now()}`, name, emoji: "🌱", category: newIngCat };
-        const next = [...custom, ing]; setCustom(next); await persist("sl-custom", next);
-        setNewIngName(""); setShowAddIng(false);
-      };
-      const removeCustom = async (id) => {
-        const next = custom.filter(c => c.id !== id); setCustom(next); await persist("sl-custom", next);
-      };
-
-      /* ─── GENERATE ─── */
-      const generate = async () => {
-        if (loading) return;
+      const generate = async()=>{
+        if(loading)return;
         setLoading(true); setErr(null); setRecipe(null); setJustSaved(false);
-        const apiKey    = localStorage.getItem("sg-api-key") || ANTHROPIC_KEY;
-        const histNames = hist.slice(-20).map(r => typeof r === "object" ? r.name : r);
-        const histStr   = histNames.length ? histNames.map(n => `"${n}"`).join(", ") : "none";
-        const msg = `${SYS}\n\n---\n\nAvailable ingredients:\n${buildList(off, custom)}\n\nPreviously made (do not repeat): ${histStr}\n\nRequest: ${prompt.trim() || "Surprise me with something creative and genuinely delicious"}`;
+        const apiKey=localStorage.getItem("sg-api-key")||ANTHROPIC_KEY;
+        const histNames=hist.slice(-20).map(r=>typeof r==="object"?r.name:r);
+        const histStr=histNames.length?histNames.map(n=>`"${n}"`).join(", "):"none";
+        const msg=`${SYS}\n\n---\n\nAvailable ingredients:\n${buildList(off,custom)}\n\nPreviously made (do not repeat): ${histStr}\n\nRequest: ${prompt.trim()||"Surprise me"}`;
         try {
           let res;
-          try {
-            res = await fetch("https://api.anthropic.com/v1/messages", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-api-key": apiKey,
-                "anthropic-version": "2023-06-01",
-                "anthropic-dangerous-direct-browser-access": "true",
-              },
-              body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: msg }] }),
-            });
-          } catch (fetchErr) { throw new Error(`Network: ${fetchErr.message}`); }
-
-          if (!res.ok) {
-            const errText = await res.text().catch(() => "");
-            if (res.status === 401) throw new Error("Invalid API key — tap ⚙️ to update it");
-            throw new Error(`HTTP ${res.status}: ${errText.slice(0, 120)}`);
-          }
-          let data;
-          try { data = await res.json(); } catch { throw new Error("Response was not JSON"); }
-          if (data.error) throw new Error(`API: ${data.error.message}`);
-
-          const text = data.content?.find(b => b.type === "text")?.text || "";
-          if (!text) throw new Error("Empty response");
-
-          let parsed;
-          try { parsed = JSON.parse(text.replace(/```json|```/g, "").trim()); }
-          catch { throw new Error(`Parse failed: ${text.slice(0, 80)}`); }
-
-          const full = { ...parsed, generatedAt: Date.now() };
+          try { res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:msg}]})}); }
+          catch(e){ throw new Error(`Network: ${e.message}`); }
+          if(!res.ok){ const t=await res.text().catch(()=>""); if(res.status===401)throw new Error("Invalid API key — tap ⚙️"); throw new Error(`HTTP ${res.status}: ${t.slice(0,100)}`); }
+          let data; try{ data=await res.json(); }catch{ throw new Error("Response was not JSON"); }
+          if(data.error)throw new Error(`API: ${data.error.message}`);
+          const text=data.content?.find(b=>b.type==="text")?.text||"";
+          if(!text)throw new Error("Empty response");
+          let parsed; try{ parsed=JSON.parse(text.replace(/```json|```/g,"").trim()); }catch{ throw new Error(`Parse failed: ${text.slice(0,80)}`); }
+          const full={...parsed,generatedAt:Date.now()};
           setRecipe(full);
-          const newHist = [...hist, full].slice(-50);
-          setHist(newHist); await persist("sl-hist-v2", newHist);
-          if (parsed.suggestion?.item) {
-            const exists = sugs.some(s => s.item.toLowerCase() === parsed.suggestion.item.toLowerCase());
-            if (!exists) {
-              const newSugs = [...sugs, { ...parsed.suggestion, id: Date.now(), acquired: false }];
-              setSugs(newSugs); await persist("sl-sugs", newSugs);
-            }
-          }
-        } catch (e) { setErr(e.message || "Unknown error"); }
+          const newHist=[...hist,full].slice(-50);
+          setHist(newHist); await persist("sl-hist-v2",newHist);
+        } catch(e){ setErr(e.message||"Unknown error"); }
         setLoading(false);
       };
 
-      /* ─── FAVORITES ─── */
-      const isSaved = (r) => r && favs.some(f => f.name === r.name);
-      const saveRecipe = async (r, withFeedback = false) => {
-        if (!r || isSaved(r)) { if (withFeedback) { setJustSaved(true); setTimeout(() => setJustSaved(false), 2200); } return; }
-        const next = [...favs, { ...r, savedAt: Date.now() }];
-        setFavs(next); await persist("sl-favs", next);
-        if (withFeedback) { setJustSaved(true); setTimeout(() => setJustSaved(false), 2200); }
+      const isSaved=(r)=>r&&favs.some(f=>f.name===r.name);
+      const saveRecipe=async(r,withFeedback=false)=>{
+        if(!r||isSaved(r)){ if(withFeedback){setJustSaved(true);setTimeout(()=>setJustSaved(false),2200);} return; }
+        const next=[...favs,{...r,savedAt:Date.now()}];
+        setFavs(next); await persist("sl-favs",next);
+        if(withFeedback){setJustSaved(true);setTimeout(()=>setJustSaved(false),2200);}
       };
-      const delFav = async (name) => {
-        const next = favs.filter(f => f.name !== name);
-        setFavs(next); await persist("sl-favs", next);
-        if (viewing?.name === name) setViewing(null);
-      };
-      const toggleAcquired = async (id) => {
-        const next = sugs.map(s => s.id === id ? { ...s, acquired: !s.acquired } : s);
-        setSugs(next); await persist("sl-sugs", next);
+      const delFav=async(name)=>{ const next=favs.filter(f=>f.name!==name); setFavs(next); await persist("sl-favs",next); if(viewing?.name===name)setViewing(null); };
+      const moveFav=async(displayIdx,direction)=>{
+        const reversed=[...favs].reverse();
+        const newIdx=displayIdx+direction;
+        if(newIdx<0||newIdx>=reversed.length)return;
+        [reversed[displayIdx],reversed[newIdx]]=[reversed[newIdx],reversed[displayIdx]];
+        const newFavs=reversed.reverse();
+        setFavs(newFavs); await persist("sl-favs",newFavs);
       };
 
-      const avCount    = [...ALL_ING, ...custom].filter(i => !off.includes(i.id)).length;
-      const unreadSugs = sugs.filter(s => !s.acquired).length;
+      const allIng   = [...ALL_ING,...custom];
+      const avCount  = allIng.filter(i=>!off.includes(i.id)).length;
+      const offCount = off.length;
       const TABS = [
-        { id: "create",      label: "Create" },
-        { id: "pantry",      label: "Pantry" },
-        { id: "favorites",   label: favs.length ? `Favorites (${favs.length})` : "Favorites" },
-        { id: "suggestions", label: unreadSugs > 0 ? `Ideas (${unreadSugs})` : "Ideas" },
+        {id:"create",    label:"Create"},
+        {id:"pantry",    label:"Pantry"},
+        {id:"favorites", label:favs.length?`Favorites (${favs.length})`:"Favorites"},
+        {id:"history",   label:hist.length?`History (${hist.length})`:"History"},
       ];
-      const btnOutline = { background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`, borderRadius: "9px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", cursor: "pointer" };
+      const btnOutline={background:"transparent",color:C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"9px",padding:"8px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"};
+
+      const IngColumn=({cat})=>{
+        const items=[...(DB[cat]||[]),...custom.filter(c=>c.category===cat)];
+        return (
+          <div style={{background:C.bg,borderRadius:"10px",padding:"10px 8px"}}>
+            <div style={{fontSize:"9px",fontWeight:"700",letterSpacing:"0.8px",textTransform:"uppercase",color:C.muted,marginBottom:"8px",lineHeight:1.2}}>{cat}</div>
+            {items.map(item=>{
+              const isOff=off.includes(item.id);
+              return (
+                <div key={item.id} onClick={()=>toggleOff(item.id)} style={{display:"flex",alignItems:"center",gap:"4px",padding:"5px 0",borderBottom:`1px solid ${C.border}`,cursor:"pointer"}}>
+                  <span style={{fontSize:"13px",flexShrink:0,opacity:isOff?0.3:1}}>{item.emoji}</span>
+                  <span style={{fontSize:"11px",flex:1,color:isOff?"#C0B8B0":"#1A1A16",textDecoration:isOff?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>{item.name}</span>
+                  <span style={{fontSize:"10px",color:isOff?"#D0CAC0":"#3D6B50",flexShrink:0}}>{isOff?"○":"●"}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      };
 
       return (
-        <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', sans-serif", color: "#1A1A16" }}>
+        <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'DM Sans', sans-serif",color:"#1A1A16"}}>
 
-          {/* SETTINGS MODAL */}
-          {showSettings && (
-            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-              <div style={{ background: C.card, borderRadius: "16px", padding: "24px", width: "100%", maxWidth: "400px" }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", color: C.dark, marginBottom: "16px" }}>Settings</div>
-                <div style={{ fontSize: "13px", color: C.muted, marginBottom: "16px", lineHeight: 1.5 }}>
-                  Override the Anthropic API key if needed. Get one at <a href="https://console.anthropic.com" target="_blank" style={{ color: C.accent }}>console.anthropic.com</a>.
-                </div>
-                <div style={{ marginBottom: "12px" }}>
-                  <div style={{ fontSize: "11px", fontWeight: "600", color: C.muted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Anthropic API Key</div>
-                  <input id="setting-sg-api-key" defaultValue={localStorage.getItem("sg-api-key") || ANTHROPIC_KEY} placeholder="sk-ant-..."
-                    autoCorrect="off" autoCapitalize="none" autoComplete="off" spellCheck="false"
-                    style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: "9px", padding: "9px 12px", fontSize: "13px", outline: "none", color: "#1A1A16", fontFamily: "monospace" }} />
-                </div>
-                <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                  <button onClick={() => {
-                    const v = document.getElementById("setting-sg-api-key")?.value.trim();
-                    if (v) localStorage.setItem("sg-api-key", v);
-                    setShowSettings(false);
-                  }} style={{ flex: 1, background: C.dark, color: "#F8F4ED", border: "none", borderRadius: "9px", padding: "11px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Save</button>
-                  <button onClick={() => setShowSettings(false)} style={btnOutline}>Cancel</button>
+          {showSettings&&(
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+              <div style={{background:C.card,borderRadius:"16px",padding:"24px",width:"100%",maxWidth:"400px"}}>
+                <div style={{fontFamily:"'Playfair Display', serif",fontSize:"20px",color:C.dark,marginBottom:"8px"}}>Settings</div>
+                <div style={{fontSize:"13px",color:C.muted,marginBottom:"14px"}}>Update your Anthropic API key if needed.</div>
+                <input id="setting-api-key" defaultValue={localStorage.getItem("sg-api-key")||ANTHROPIC_KEY} autoCorrect="off" autoCapitalize="none" autoComplete="off" spellCheck="false"
+                  style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"9px",padding:"10px 12px",fontSize:"12px",outline:"none",color:"#1A1A16",fontFamily:"monospace",marginBottom:"14px"}}/>
+                <div style={{display:"flex",gap:"10px"}}>
+                  <button onClick={()=>{const v=document.getElementById("setting-api-key")?.value.trim();if(v)localStorage.setItem("sg-api-key",v);setShowSettings(false);}} style={{flex:1,background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"9px",padding:"11px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Save</button>
+                  <button onClick={()=>setShowSettings(false)} style={btnOutline}>Cancel</button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* HEADER */}
-          <div style={{ background: C.dark, padding: "18px 20px 0" }}>
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "26px", fontWeight: "700", color: "#F8F4ED", margin: 0 }}>Smoothie Generator</h1>
-                <div style={{ fontSize: "12px", color: C.light, marginTop: "2px" }}>{avCount} ingredients · {hist.length} made</div>
-              </div>
-              <button onClick={() => setShowSettings(true)} style={{ background: "none", border: "none", color: C.light, fontSize: "20px", cursor: "pointer", padding: "4px 0 4px 8px" }}>⚙️</button>
+          <div style={{background:C.dark,padding:"18px 20px 0"}}>
+            <div style={{display:"flex",alignItems:"center"}}>
+              <h1 style={{fontFamily:"'Playfair Display', serif",fontSize:"26px",fontWeight:"700",color:"#F8F4ED",margin:0,flex:1}}>Smoothie Generator</h1>
+              <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",color:C.light,fontSize:"20px",cursor:"pointer",padding:"4px 0 4px 8px"}}>⚙️</button>
             </div>
-            <div style={{ display: "flex", marginTop: "12px" }}>
-              {TABS.map(({ id, label }) => (
-                <button key={id} onClick={() => { setTab(id); setViewing(null); }} style={{ padding: "10px 12px", fontSize: "13px", fontWeight: tab === id ? "600" : "400", color: tab === id ? "#F8F4ED" : C.light, background: "none", border: "none", borderBottom: tab === id ? `2px solid ${C.accent}` : "2px solid transparent", cursor: "pointer" }}>
+            <div style={{fontSize:"12px",color:C.light,marginTop:"2px"}}>{avCount} ingredients selected · {hist.length} made</div>
+            <div style={{display:"flex",marginTop:"12px"}}>
+              {TABS.map(({id,label})=>(
+                <button key={id} onClick={()=>{setTab(id);setViewing(null);if(id==="create")setCreateStep(1);}}
+                  style={{padding:"10px 11px",fontSize:"12px",fontWeight:tab===id?"600":"400",color:tab===id?"#F8F4ED":C.light,background:"none",border:"none",borderBottom:tab===id?`2px solid ${C.accent}`:"2px solid transparent",cursor:"pointer"}}>
                   {label}
                 </button>
               ))}
             </div>
           </div>
 
-          <div style={{ padding: "20px 16px", maxWidth: "640px", margin: "0 auto" }}>
+          <div style={{padding:"20px 16px",maxWidth:"640px",margin:"0 auto"}}>
 
             {/* ── CREATE ── */}
-            {tab === "create" && (
+            {tab==="create"&&(
               <div>
-                <div style={{ background: C.card, borderRadius: "14px", padding: "18px", marginBottom: "14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                  <div style={{ fontSize: "11px", fontWeight: "600", letterSpacing: "1px", textTransform: "uppercase", color: C.muted, marginBottom: "8px" }}>What sounds good?</div>
-                  <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
-                    placeholder="tropical and light… high-protein post-ride… use up the mango…" rows={3}
-                    style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: "10px", padding: "11px 13px", fontSize: "14px", color: "#1A1A16", resize: "none", outline: "none", lineHeight: 1.5 }} />
-                  {off.length > 0 && (
-                    <div style={{ marginTop: "8px", fontSize: "12px", color: C.muted }}>
-                      Skipping: {off.map(id => [...ALL_ING, ...custom].find(i => i.id === id)?.name).filter(Boolean).join(", ")}
-                      {" · "}<span onClick={clearOff} style={{ color: C.accent, cursor: "pointer", textDecoration: "underline" }}>reset</span>
+                {createStep===1&&(
+                  <div style={{background:C.card,borderRadius:"14px",padding:"16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px",gap:"12px"}}>
+                      <div>
+                        <div style={{fontFamily:"'Playfair Display', serif",fontSize:"20px",fontWeight:"700",color:C.dark}}>What do you have?</div>
+                        {offCount>0&&<div style={{fontSize:"12px",color:C.muted,marginTop:"2px"}}>{offCount} deselected · <span onClick={clearOff} style={{color:C.accent,cursor:"pointer",textDecoration:"underline"}}>reset</span></div>}
+                      </div>
+                      <button onClick={()=>setCreateStep(2)} style={{background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"10px",padding:"10px 18px",fontSize:"14px",fontWeight:"600",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>Next →</button>
                     </div>
-                  )}
-                  <button onClick={generate} disabled={loading} style={{ width: "100%", marginTop: "12px", background: loading ? "#4A7060" : C.dark, color: "#F8F4ED", border: "none", borderRadius: "10px", padding: "13px", fontSize: "14px", fontWeight: "600", cursor: loading ? "default" : "pointer" }}>
-                    {loading ? "Blending…" : "Generate Smoothie ✦"}
-                  </button>
-                  {err && <div style={{ color: C.accent, fontSize: "12px", marginTop: "8px", wordBreak: "break-word", lineHeight: 1.5 }}>⚠️ {err}</div>}
-                </div>
-                {recipe && (
-                  <div style={{ background: C.card, borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                    <RecipeCard r={recipe} onSave={() => saveRecipe(recipe, true)} saveLabel={justSaved ? "Saved ✓" : "Save to Favorites"} onRegenerate={generate} />
+                    {CREATE_ROWS.map((row,ri)=>(
+                      <div key={ri} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"6px",marginBottom:ri<CREATE_ROWS.length-1?"6px":"0"}}>
+                        {row.map(cat=><IngColumn key={cat} cat={cat}/>)}
+                      </div>
+                    ))}
                   </div>
                 )}
-                {!recipe && !loading && (
-                  <div style={{ textAlign: "center", color: "#B0A89A", fontSize: "13px", paddingTop: "6px" }}>
-                    {hist.length === 0 ? "Your first blend awaits." : `${hist.length} smoothie${hist.length !== 1 ? "s" : ""} generated so far.`}
+
+                {createStep===2&&(
+                  <div>
+                    {recipe?(
+                      // Recipe view — replaces the form
+                      <div>
+                        <div style={{display:"flex",gap:"10px",marginBottom:"14px"}}>
+                          <button onClick={()=>{setCreateStep(1);setRecipe(null);setErr(null);}} style={{...btnOutline,fontSize:"12px"}}>← Ingredients</button>
+                          <button onClick={()=>{setRecipe(null);setErr(null);}} style={{...btnOutline,fontSize:"12px"}}>New search</button>
+                        </div>
+                        <div style={{background:C.card,borderRadius:"14px",padding:"20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                          <RecipeCard r={recipe} onSave={()=>saveRecipe(recipe,true)} saveLabel={justSaved?"Saved ✓":"Save to Favorites"} onRegenerate={generate}/>
+                        </div>
+                      </div>
+                    ):(
+                      // Form view
+                      <div style={{background:C.card,borderRadius:"14px",padding:"18px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                        <button onClick={()=>{setCreateStep(1);setErr(null);}} style={{background:"none",border:"none",color:C.muted,fontSize:"13px",cursor:"pointer",marginBottom:"14px",padding:0}}>← Back</button>
+                        <div style={{fontFamily:"'Playfair Display', serif",fontSize:"20px",fontWeight:"700",color:C.dark,marginBottom:"4px"}}>What sounds good?</div>
+                        <div style={{fontSize:"13px",color:C.muted,marginBottom:"12px"}}>
+                          {offCount>0?`${offCount} ingredient${offCount!==1?"s":""} deselected`:"All ingredients selected"}
+                        </div>
+                        <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="high-protein post-ride… tropical… use up the mango…" rows={3}
+                          style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"11px 13px",fontSize:"14px",color:"#1A1A16",resize:"none",outline:"none",lineHeight:1.5}}/>
+                        <button onClick={generate} disabled={loading} style={{width:"100%",marginTop:"12px",background:loading?"#4A7060":C.dark,color:"#F8F4ED",border:"none",borderRadius:"10px",padding:"13px",fontSize:"14px",fontWeight:"600",cursor:loading?"default":"pointer"}}>
+                          {loading?"Blending…":"Generate Smoothie ✦"}
+                        </button>
+                        {err&&<div style={{color:C.accent,fontSize:"12px",marginTop:"8px",wordBreak:"break-word",lineHeight:1.5}}>⚠️ {err}</div>}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
             {/* ── PANTRY ── */}
-            {tab === "pantry" && (
+            {tab==="pantry"&&(
               <div>
-                <div style={{ marginBottom: "20px" }}>
-                  {!showAddIng ? (
-                    <button onClick={() => setShowAddIng(true)} style={{ background: C.card, color: C.dark, border: `1.5px dashed ${C.border}`, borderRadius: "10px", padding: "12px 16px", fontSize: "13px", fontWeight: "600", cursor: "pointer", width: "100%" }}>
-                      ＋ Add ingredient to pantry
-                    </button>
-                  ) : (
-                    <div style={{ background: C.card, borderRadius: "12px", padding: "16px", border: `1px solid ${C.border}` }}>
-                      <div style={{ fontSize: "11px", fontWeight: "600", letterSpacing: "1px", textTransform: "uppercase", color: C.muted, marginBottom: "10px" }}>New Ingredient</div>
-                      <input value={newIngName} onChange={e => setNewIngName(e.target.value)} onKeyDown={e => e.key === "Enter" && addCustomIng()} placeholder="e.g. Açaí Powder" autoFocus
-                        style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: "9px", padding: "10px 12px", fontSize: "14px", outline: "none", marginBottom: "10px", color: "#1A1A16" }} />
-                      <select value={newIngCat} onChange={e => setNewIngCat(e.target.value)}
-                        style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: "9px", padding: "10px 12px", fontSize: "14px", outline: "none", marginBottom: "12px", color: "#1A1A16" }}>
-                        {Object.keys(DB).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                <div style={{marginBottom:"20px"}}>
+                  {!showAddIng?(
+                    <button onClick={()=>setShowAddIng(true)} style={{background:C.card,color:C.dark,border:`1.5px dashed ${C.border}`,borderRadius:"10px",padding:"12px 16px",fontSize:"13px",fontWeight:"600",cursor:"pointer",width:"100%"}}>＋ Add ingredient to pantry</button>
+                  ):(
+                    <div style={{background:C.card,borderRadius:"12px",padding:"16px",border:`1px solid ${C.border}`}}>
+                      <div style={{fontSize:"11px",fontWeight:"600",letterSpacing:"1px",textTransform:"uppercase",color:C.muted,marginBottom:"10px"}}>New Ingredient</div>
+                      <input value={newIngName} onChange={e=>setNewIngName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomIng()} placeholder="e.g. Açaí Powder" autoFocus
+                        style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"9px",padding:"10px 12px",fontSize:"14px",outline:"none",marginBottom:"10px",color:"#1A1A16"}}/>
+                      <select value={newIngCat} onChange={e=>setNewIngCat(e.target.value)} style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"9px",padding:"10px 12px",fontSize:"14px",outline:"none",marginBottom:"12px",color:"#1A1A16"}}>
+                        {Object.keys(DB).map(cat=><option key={cat} value={cat}>{cat}</option>)}
                       </select>
-                      <div style={{ display: "flex", gap: "10px" }}>
-                        <button onClick={addCustomIng} style={{ flex: 1, background: C.dark, color: "#F8F4ED", border: "none", borderRadius: "9px", padding: "11px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Add</button>
-                        <button onClick={() => { setShowAddIng(false); setNewIngName(""); }} style={btnOutline}>Cancel</button>
+                      <div style={{display:"flex",gap:"10px"}}>
+                        <button onClick={addCustomIng} style={{flex:1,background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"9px",padding:"11px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Add</button>
+                        <button onClick={()=>{setShowAddIng(false);setNewIngName("");}} style={btnOutline}>Cancel</button>
                       </div>
                     </div>
                   )}
                 </div>
-                <p style={{ fontSize: "13px", color: C.muted, margin: "0 0 8px 0" }}>Tap to mark ingredients as unavailable.</p>
-                {off.length > 0 && <button onClick={clearOff} style={{ ...btnOutline, marginBottom: "12px", fontSize: "12px" }}>Re-enable all ({off.length})</button>}
-                {Object.entries(DB).map(([cat, items]) => {
-                  const customInCat = custom.filter(c => c.category === cat);
+                <p style={{fontSize:"13px",color:C.muted,margin:"0 0 8px 0"}}>Tap to toggle ingredients on or off.</p>
+                {off.length>0&&<button onClick={clearOff} style={{...btnOutline,marginBottom:"12px",fontSize:"12px"}}>Re-enable all ({off.length})</button>}
+                {Object.entries(DB).map(([cat,items])=>{
+                  const customInCat=custom.filter(c=>c.category===cat);
                   return (
                     <div key={cat}>
-                      <div style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.8px", textTransform: "uppercase", color: C.dark, marginTop: "18px", marginBottom: "8px", paddingLeft: "9px", borderLeft: `3px solid ${C.accent}` }}>{cat}</div>
-                      {[...items, ...customInCat].map(item => {
-                        const isOff = off.includes(item.id), isCust = item.id.startsWith("custom_");
+                      <div style={{fontSize:"11px",fontWeight:"700",letterSpacing:"0.8px",textTransform:"uppercase",color:C.dark,marginTop:"18px",marginBottom:"8px",paddingLeft:"9px",borderLeft:`3px solid ${C.accent}`}}>{cat}</div>
+                      {[...items,...customInCat].map(item=>{
+                        const isOff=off.includes(item.id),isCust=item.id.startsWith("custom_");
                         return (
-                          <div key={item.id} style={{ display: "flex", alignItems: "center", padding: "9px 12px", borderRadius: "9px", marginBottom: "5px", background: isOff ? "#F0EDE6" : C.card, border: `1px solid ${isOff ? "#D0CAC0" : C.border}`, opacity: isOff ? 0.65 : 1 }}>
-                            <span onClick={() => toggleOff(item.id)} style={{ fontSize: "18px", marginRight: "10px", cursor: "pointer" }}>{item.emoji}</span>
-                            <span onClick={() => toggleOff(item.id)} style={{ fontSize: "14px", flex: 1, cursor: "pointer", textDecoration: isOff ? "line-through" : "none", color: isOff ? C.muted : "#1A1A16" }}>{item.name}</span>
-                            {isCust
-                              ? <button onClick={() => removeCustom(item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C0B8AC", fontSize: "18px", padding: "0 4px" }}>×</button>
-                              : <span onClick={() => toggleOff(item.id)} style={{ fontSize: "12px", color: isOff ? "#B0A898" : "#3D6B50", fontWeight: "600", cursor: "pointer" }}>{isOff ? "off" : "✓"}</span>
-                            }
+                          <div key={item.id} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderRadius:"9px",marginBottom:"5px",background:isOff?"#F0EDE6":C.card,border:`1px solid ${isOff?"#D0CAC0":C.border}`,opacity:isOff?0.65:1}}>
+                            <span onClick={()=>toggleOff(item.id)} style={{fontSize:"18px",marginRight:"10px",cursor:"pointer"}}>{item.emoji}</span>
+                            <span onClick={()=>toggleOff(item.id)} style={{fontSize:"14px",flex:1,cursor:"pointer",textDecoration:isOff?"line-through":"none",color:isOff?C.muted:"#1A1A16"}}>{item.name}</span>
+                            {isCust?<button onClick={()=>removeCustom(item.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#C0B8AC",fontSize:"18px",padding:"0 4px"}}>×</button>
+                            :<span onClick={()=>toggleOff(item.id)} style={{fontSize:"12px",color:isOff?"#B0A898":"#3D6B50",fontWeight:"600",cursor:"pointer"}}>{isOff?"off":"✓"}</span>}
                           </div>
                         );
                       })}
@@ -506,83 +390,86 @@ Rules:
             )}
 
             {/* ── FAVORITES ── */}
-            {tab === "favorites" && (
+            {tab==="favorites"&&(
               <div>
-                {viewing ? (
+                {viewing&&viewingFrom==="favorites"?(
                   <>
-                    <button onClick={() => setViewing(null)} style={{ ...btnOutline, marginBottom: "14px" }}>← Back</button>
-                    <div style={{ background: C.card, borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                      <RecipeCard r={viewing}
-                        onSave={favSubTab === "history" && !isSaved(viewing) ? () => saveRecipe(viewing) : undefined}
-                        saveLabel={isSaved(viewing) ? "Saved ✓" : "Save to Favorites"}
-                        onDelete={favSubTab === "saved" ? () => delFav(viewing.name) : undefined} />
+                    <button onClick={()=>setViewing(null)} style={{...btnOutline,marginBottom:"14px"}}>← Back</button>
+                    <div style={{background:C.card,borderRadius:"14px",padding:"20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                      <RecipeCard r={viewing} onDelete={()=>delFav(viewing.name)}/>
                     </div>
                   </>
-                ) : (
+                ):favs.length===0?(
+                  <div style={{textAlign:"center",color:C.muted,padding:"52px 20px"}}>
+                    <div style={{fontSize:"32px",marginBottom:"10px"}}>⭐</div>
+                    <div style={{fontSize:"14px"}}>No favorites yet.</div>
+                    <div style={{fontSize:"12px",marginTop:"4px"}}>Generate a smoothie and save it here.</div>
+                  </div>
+                ):(
                   <>
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-                      {[["saved", `Saved (${favs.length})`], ["history", `History (${hist.length})`]].map(([id, label]) => (
-                        <button key={id} onClick={() => setFavSubTab(id)} style={{ padding: "7px 14px", fontSize: "13px", fontWeight: favSubTab === id ? "600" : "400", color: favSubTab === id ? "#F8F4ED" : C.dark, background: favSubTab === id ? C.dark : "transparent", border: `1.5px solid ${favSubTab === id ? C.dark : C.border}`, borderRadius: "20px", cursor: "pointer" }}>{label}</button>
-                      ))}
-                    </div>
-                    {favSubTab === "saved" && (favs.length === 0
-                      ? <div style={{ textAlign: "center", color: C.muted, padding: "52px 20px" }}><div style={{ fontSize: "32px", marginBottom: "10px" }}>⭐</div><div style={{ fontSize: "14px" }}>No favorites yet.</div></div>
-                      : [...favs].reverse().map(fav => (
-                        <div key={fav.name} onClick={() => setViewing(fav)} style={{ background: C.card, borderRadius: "12px", padding: "14px 16px", marginBottom: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", cursor: "pointer", border: `1px solid ${C.border}` }}>
-                          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "17px", fontWeight: "700", color: C.dark, marginBottom: "3px" }}>{fav.name}</div>
-                          <div style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>{fav.tagline}</div>
+                    <p style={{fontSize:"13px",color:C.muted,marginTop:0,marginBottom:"12px"}}>{favs.length} saved · drag ↑↓ to reorder</p>
+                    {[...favs].reverse().map((fav,idx)=>(
+                      <div key={fav.name} style={{background:C.card,borderRadius:"12px",padding:"12px 14px",marginBottom:"10px",boxShadow:"0 1px 3px rgba(0,0,0,0.05)",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:"10px"}}>
+                        <div onClick={()=>{setViewing(fav);setViewingFrom("favorites");}} style={{flex:1,cursor:"pointer",minWidth:0}}>
+                          <div style={{fontFamily:"'Playfair Display', serif",fontSize:"16px",fontWeight:"700",color:C.dark,marginBottom:"2px"}}>{fav.name}</div>
+                          <div style={{fontSize:"12px",color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fav.tagline}</div>
                         </div>
-                      ))
-                    )}
-                    {favSubTab === "history" && (hist.length === 0
-                      ? <div style={{ textAlign: "center", color: C.muted, padding: "52px 20px" }}><div style={{ fontSize: "32px", marginBottom: "10px" }}>📜</div><div style={{ fontSize: "14px" }}>No history yet.</div></div>
-                      : <>
-                          <p style={{ fontSize: "13px", color: C.muted, marginTop: 0, marginBottom: "12px" }}>All generated recipes. Tap any to view or save.</p>
-                          {[...hist].reverse().map((r, idx) => {
-                            if (typeof r !== "object" || !r.name) return null;
-                            const saved = isSaved(r);
-                            return (
-                              <div key={r.generatedAt || idx} style={{ background: C.card, borderRadius: "12px", padding: "14px 16px", marginBottom: "10px", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: "12px" }}>
-                                <div onClick={() => setViewing(r)} style={{ flex: 1, cursor: "pointer", minWidth: 0 }}>
-                                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "16px", fontWeight: "700", color: C.dark, marginBottom: "2px" }}>{r.name}</div>
-                                  <div style={{ fontSize: "12px", color: C.muted, fontStyle: "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: "3px" }}>{r.tagline}</div>
-                                  {r.generatedAt && <div style={{ fontSize: "11px", color: "#B0A89A" }}>{fmtDate(r.generatedAt)}</div>}
-                                </div>
-                                <button onClick={() => saveRecipe(r)} style={{ background: saved ? "#EDF6F1" : C.accent, color: saved ? "#3D6B50" : "#FFF", border: "none", borderRadius: "8px", padding: "7px 11px", fontSize: "12px", fontWeight: "600", cursor: saved ? "default" : "pointer", flexShrink: 0 }}>
-                                  {saved ? "Saved ✓" : "Save"}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </>
-                    )}
+                        {fav.icons&&fav.icons.length>0&&(
+                          <div onClick={()=>{setViewing(fav);setViewingFrom("favorites");}} style={{display:"flex",gap:"2px",fontSize:"18px",cursor:"pointer",flexShrink:0}}>
+                            {fav.icons.slice(0,3).map((ic,i)=><span key={i}>{ic}</span>)}
+                          </div>
+                        )}
+                        <div style={{display:"flex",flexDirection:"column",gap:"3px",flexShrink:0}}>
+                          <button onClick={e=>{e.stopPropagation();moveFav(idx,-1);}}
+                            disabled={idx===0}
+                            style={{background:idx===0?"#F5F2EC":"#ECEAE3",border:"none",borderRadius:"5px",width:"26px",height:"26px",fontSize:"12px",cursor:idx===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",opacity:idx===0?0.3:1}}>↑</button>
+                          <button onClick={e=>{e.stopPropagation();moveFav(idx,1);}}
+                            disabled={idx===favs.length-1}
+                            style={{background:idx===favs.length-1?"#F5F2EC":"#ECEAE3",border:"none",borderRadius:"5px",width:"26px",height:"26px",fontSize:"12px",cursor:idx===favs.length-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",opacity:idx===favs.length-1?0.3:1}}>↓</button>
+                        </div>
+                      </div>
+                    ))}
                   </>
                 )}
               </div>
             )}
 
-            {/* ── IDEAS ── */}
-            {tab === "suggestions" && (
+            {/* ── HISTORY ── */}
+            {tab==="history"&&(
               <div>
-                <p style={{ fontSize: "13px", color: C.muted, marginTop: 0, marginBottom: "14px" }}>Ingredients worth picking up. Mark acquired, then add to your pantry.</p>
-                {sugs.length === 0
-                  ? <div style={{ textAlign: "center", color: C.muted, padding: "52px 20px" }}><div style={{ fontSize: "32px", marginBottom: "10px" }}>🛒</div><div>No suggestions yet.</div></div>
-                  : sugs.map(sug => (
-                    <div key={sug.id} style={{ display: "flex", gap: "12px", background: C.card, borderRadius: "12px", padding: "14px 16px", marginBottom: "10px", border: `1px solid ${C.border}`, alignItems: "flex-start", opacity: sug.acquired ? 0.5 : 1 }}>
-                      <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: C.tag, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>🛒</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                          {sug.item}
-                          {sug.acquired && <span style={{ fontSize: "11px", color: "#3D6B50", fontWeight: "400", background: C.green, padding: "2px 7px", borderRadius: "4px" }}>acquired</span>}
-                        </div>
-                        <div style={{ fontSize: "13px", color: "#6B6B5A", lineHeight: 1.45 }}>{sug.reason}</div>
-                      </div>
-                      <button onClick={() => toggleAcquired(sug.id)} style={{ background: "transparent", color: sug.acquired ? C.muted : C.dark, border: `1.5px solid ${sug.acquired ? "#C8C4BA" : C.dark}`, borderRadius: "8px", padding: "6px 10px", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}>
-                        {sug.acquired ? "Undo" : "Got it"}
-                      </button>
+                {viewing&&viewingFrom==="history"?(
+                  <>
+                    <button onClick={()=>setViewing(null)} style={{...btnOutline,marginBottom:"14px"}}>← Back</button>
+                    <div style={{background:C.card,borderRadius:"14px",padding:"20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                      <RecipeCard r={viewing} onSave={!isSaved(viewing)?()=>saveRecipe(viewing):undefined} saveLabel={isSaved(viewing)?"Saved ✓":"Save to Favorites"}/>
                     </div>
-                  ))
-                }
+                  </>
+                ):hist.length===0?(
+                  <div style={{textAlign:"center",color:C.muted,padding:"52px 20px"}}>
+                    <div style={{fontSize:"32px",marginBottom:"10px"}}>📜</div>
+                    <div style={{fontSize:"14px"}}>No history yet.</div>
+                  </div>
+                ):(
+                  <>
+                    <p style={{fontSize:"13px",color:C.muted,marginTop:0,marginBottom:"12px"}}>All generated recipes. Tap to view or save.</p>
+                    {[...hist].reverse().map((r,idx)=>{
+                      if(typeof r!=="object"||!r.name)return null;
+                      const saved=isSaved(r);
+                      return (
+                        <div key={r.generatedAt||idx} style={{background:C.card,borderRadius:"12px",padding:"14px 16px",marginBottom:"10px",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:"12px"}}>
+                          <div onClick={()=>{setViewing(r);setViewingFrom("history");}} style={{flex:1,cursor:"pointer",minWidth:0}}>
+                            <div style={{fontFamily:"'Playfair Display', serif",fontSize:"16px",fontWeight:"700",color:C.dark,marginBottom:"2px"}}>{r.name}</div>
+                            <div style={{fontSize:"12px",color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginBottom:"3px"}}>{r.tagline}</div>
+                            {r.generatedAt&&<div style={{fontSize:"11px",color:"#B0A89A"}}>{fmtDate(r.generatedAt)}</div>}
+                          </div>
+                          <button onClick={()=>saveRecipe(r)} style={{background:saved?"#EDF6F1":C.accent,color:saved?"#3D6B50":"#FFF",border:"none",borderRadius:"8px",padding:"7px 11px",fontSize:"12px",fontWeight:"600",cursor:saved?"default":"pointer",flexShrink:0}}>
+                            {saved?"Saved ✓":"Save"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             )}
 
@@ -591,7 +478,7 @@ Rules:
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<SmoothieGenerator />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<SmoothieGenerator/>);
   </script>
 </body>
 </html>
