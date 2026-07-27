@@ -39,13 +39,13 @@
       "Bases":    [ { id:"coconut_milk", name:"Coconut Milk", emoji:"🥥" }, { id:"coconut_water", name:"Coconut Water", emoji:"💧" }, { id:"oat_milk", name:"Oat Milk", emoji:"🥛" } ],
       "Proteins": [ { id:"greek_yogurt", name:"Greek Yogurt", emoji:"🫙" }, { id:"choc_protein", name:"Chocolate Protein", emoji:"🍫" }, { id:"van_protein", name:"Vanilla Protein", emoji:"✨" } ],
       "Fruits":   [ { id:"banana", name:"Banana", emoji:"🍌" }, { id:"avocado", name:"Avocado", emoji:"🥑" }, { id:"mixed_berries", name:"Mixed Berries", emoji:"🫐" }, { id:"blueberries", name:"Blueberries", emoji:"🔵" }, { id:"raspberries", name:"Raspberries", emoji:"🍇" }, { id:"strawberries", name:"Strawberries", emoji:"🍓" }, { id:"pineapple", name:"Pineapple", emoji:"🍍" }, { id:"mango", name:"Mango", emoji:"🥭" } ],
-      "Vegetables": [ { id:"spinach", name:"Spinach", emoji:"🥬" }, { id:"kale", name:"Kale", emoji:"🥬" }, { id:"carrots", name:"Carrots", emoji:"🥕" } ],
+      "Vegetables": [ { id:"spinach", name:"Spinach", emoji:"🌿" }, { id:"kale", name:"Kale", emoji:"🥬" }, { id:"carrots", name:"Carrots", emoji:"🥕" } ],
       "Nuts, Seeds & Sweeteners": [ { id:"peanut_butter", name:"Peanut Butter", emoji:"🥜" }, { id:"almond_butter", name:"Almond Butter", emoji:"🌰" }, { id:"chia_seeds", name:"Chia Seeds", emoji:"⚫" }, { id:"flaxseed", name:"Flaxseed", emoji:"🟤" }, { id:"honey", name:"Honey", emoji:"🍯" } ],
       "Spices":   [ { id:"ginger", name:"Ginger", emoji:"🫚" }, { id:"cinnamon", name:"Cinnamon", emoji:"🟫" }, { id:"turmeric", name:"Turmeric", emoji:"🟡" }, { id:"cardamom", name:"Cardamom", emoji:"🌿" }, { id:"nutmeg", name:"Nutmeg", emoji:"🌰" }, { id:"cayenne", name:"Cayenne", emoji:"🌶️" }, { id:"black_pepper", name:"Black Pepper", emoji:"⚫" }, { id:"vanilla_ext", name:"Vanilla Extract", emoji:"🤍" }, { id:"cloves", name:"Cloves", emoji:"🫙" }, { id:"allspice", name:"Allspice", emoji:"🟤" } ],
     };
 
     const ALL_ING    = Object.values(DB).flat();
-    const CREATE_ROWS = [ ["Bases","Proteins","Fruits"], ["Vegetables","Nuts, Seeds & Sweeteners","Spices"] ];
+    // Create step layout defined inline below
 
     const BAR_COLORS = {
       "Bases":                    "#1B4B8A",
@@ -243,7 +243,7 @@ Rules:
       const IngColumn=({cat})=>{
         const items=[...(DB[cat]||[]),...custom.filter(c=>c.category===cat)];
         return (
-          <div style={{background:C.bg,borderRadius:"10px",padding:"10px 8px"}}>
+          <div style={{background:C.bg,borderRadius:"10px",padding:"10px 8px",width:"100%",boxSizing:"border-box"}}>
             <div style={{fontSize:"9px",fontWeight:"700",letterSpacing:"0.8px",textTransform:"uppercase",color:C.muted,marginBottom:"8px",lineHeight:1.2}}>{cat}</div>
             {items.map(item=>{
               const isOff=off.includes(item.id);
@@ -267,8 +267,8 @@ Rules:
               <div style={{background:C.card,borderRadius:"16px",padding:"24px",width:"100%",maxWidth:"400px"}}>
                 <div style={{fontFamily:"'Playfair Display', serif",fontSize:"20px",color:C.dark,marginBottom:"8px"}}>Settings</div>
                 <div style={{fontSize:"13px",color:C.muted,marginBottom:"14px"}}>Update your Anthropic API key if needed.</div>
-                <input id="setting-api-key" defaultValue={localStorage.getItem("sg-api-key")||ANTHROPIC_KEY} autoCorrect="off" autoCapitalize="none" autoComplete="off" spellCheck="false"
-                  style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"9px",padding:"10px 12px",fontSize:"12px",outline:"none",color:"#1A1A16",fontFamily:"monospace",marginBottom:"14px"}}/>
+                <input id="setting-api-key" defaultValue={localStorage.getItem("sg-api-key")||ANTHROPIC_KEY} autoCorrect="off" autoCapitalize="none" autoComplete="off" spellCheck="false" type="text"
+                  style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"9px",padding:"10px 12px",fontSize:"11px",outline:"none",color:"#1A1A16",fontFamily:"monospace",marginBottom:"14px",letterSpacing:"0.3px"}}/>
                 <div style={{display:"flex",gap:"10px"}}>
                   <button onClick={()=>{const v=document.getElementById("setting-api-key")?.value.trim();if(v)localStorage.setItem("sg-api-key",v);setShowSettings(false);}} style={{flex:1,background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"9px",padding:"11px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Save</button>
                   <button onClick={()=>setShowSettings(false)} style={btnOutline}>Cancel</button>
@@ -307,11 +307,19 @@ Rules:
                       </div>
                       <button onClick={()=>setCreateStep(2)} style={{background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"10px",padding:"10px 18px",fontSize:"14px",fontWeight:"600",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>Next →</button>
                     </div>
-                    {CREATE_ROWS.map((row,ri)=>(
-                      <div key={ri} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"6px",marginBottom:ri<CREATE_ROWS.length-1?"6px":"0"}}>
-                        {row.map(cat=><IngColumn key={cat} cat={cat}/>)}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"6px",alignItems:"start"}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:"6px",minWidth:0}}>
+                        <IngColumn cat="Bases"/>
+                        <IngColumn cat="Vegetables"/>
                       </div>
-                    ))}
+                      <div style={{display:"flex",flexDirection:"column",gap:"6px",minWidth:0}}>
+                        <IngColumn cat="Proteins"/>
+                        <IngColumn cat="Nuts, Seeds & Sweeteners"/>
+                      </div>
+                      <div style={{minWidth:0}}>
+                        <IngColumn cat="Fruits"/>
+                      </div>
+                    </div>
                   </div>
                 )}
 
