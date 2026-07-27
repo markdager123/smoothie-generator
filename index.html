@@ -132,7 +132,7 @@ Rules:
           <div style={{display:"flex",gap:"10px",marginTop:"16px",flexWrap:"wrap"}}>
             {onSave&&<button onClick={onSave} style={{flex:1,minWidth:"120px",background:saveLabel.includes("✓")?C.dark:C.accent,color:"#FFF",border:"none",borderRadius:"10px",padding:"11px 16px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>{saveLabel}</button>}
             {onRegenerate&&<button onClick={onRegenerate} style={{background:"transparent",color:C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"10px",padding:"11px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Regenerate</button>}
-            {onDelete&&<button onClick={onDelete} style={{background:"transparent",color:"#B03A2E",border:"1.5px solid #B03A2E",borderRadius:"10px",padding:"8px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Remove</button>}
+            {onDelete&&<button onClick={onDelete} style={{background:"#7B1A1A",color:"#FFF",border:"none",borderRadius:"10px",padding:"8px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Remove</button>}
           </div>
         </div>
       );
@@ -161,6 +161,7 @@ Rules:
       const [newIngName,   setNewIngName]   = useState("");
       const [newIngCat,    setNewIngCat]    = useState("Fruits");
       const [showSettings, setShowSettings] = useState(false);
+      const [histEditMode,  setHistEditMode]  = useState(false);
 
       useEffect(()=>{
         (async()=>{
@@ -215,6 +216,10 @@ Rules:
         if(withFeedback){setJustSaved(true);setTimeout(()=>setJustSaved(false),2200);}
       };
       const delFav=async(name)=>{ const next=favs.filter(f=>f.name!==name); setFavs(next); await persist("sl-favs",next); if(viewing?.name===name)setViewing(null); };
+      const deleteHistEntry=async(generatedAt)=>{
+        const next=hist.filter(r=>typeof r==="object"&&r.generatedAt!==generatedAt);
+        setHist(next); await persist("sl-hist-v2",next);
+      };
       const moveFav=async(displayIdx,direction)=>{
         const reversed=[...favs].reverse();
         const newIdx=displayIdx+direction;
@@ -451,20 +456,30 @@ Rules:
                   </div>
                 ):(
                   <>
-                    <p style={{fontSize:"13px",color:C.muted,marginTop:0,marginBottom:"12px"}}>All generated recipes. Tap to view or save.</p>
+                    <div style={{display:"flex",alignItems:"center",marginBottom:"12px"}}>
+                      <p style={{fontSize:"13px",color:C.muted,margin:0,flex:1}}>All generated recipes. Tap to view or save.</p>
+                      <button onClick={()=>setHistEditMode(m=>!m)} style={{background:histEditMode?"#1A3028":"transparent",color:histEditMode?"#F8F4ED":C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"8px",padding:"5px 12px",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
+                        {histEditMode?"Done":"Edit"}
+                      </button>
+                    </div>
                     {[...hist].reverse().map((r,idx)=>{
                       if(typeof r!=="object"||!r.name)return null;
                       const saved=isSaved(r);
                       return (
                         <div key={r.generatedAt||idx} style={{background:C.card,borderRadius:"12px",padding:"14px 16px",marginBottom:"10px",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:"12px"}}>
-                          <div onClick={()=>{setViewing(r);setViewingFrom("history");}} style={{flex:1,cursor:"pointer",minWidth:0}}>
+                          {histEditMode&&(
+                            <button onClick={()=>deleteHistEntry(r.generatedAt)} style={{background:"#7B1A1A",color:"#FFF",border:"none",borderRadius:"7px",width:"28px",height:"28px",fontSize:"14px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                          )}
+                          <div onClick={()=>{if(!histEditMode){setViewing(r);setViewingFrom("history");}}} style={{flex:1,cursor:histEditMode?"default":"pointer",minWidth:0,opacity:histEditMode?0.6:1}}>
                             <div style={{fontFamily:"'Playfair Display', serif",fontSize:"16px",fontWeight:"700",color:C.dark,marginBottom:"2px"}}>{r.name}</div>
                             <div style={{fontSize:"12px",color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginBottom:"3px"}}>{r.tagline}</div>
                             {r.generatedAt&&<div style={{fontSize:"11px",color:"#B0A89A"}}>{fmtDate(r.generatedAt)}</div>}
                           </div>
-                          <button onClick={()=>saveRecipe(r)} style={{background:saved?"#EDF6F1":C.accent,color:saved?"#3D6B50":"#FFF",border:"none",borderRadius:"8px",padding:"7px 11px",fontSize:"12px",fontWeight:"600",cursor:saved?"default":"pointer",flexShrink:0}}>
-                            {saved?"Saved ✓":"Save"}
-                          </button>
+                          {!histEditMode&&(
+                            <button onClick={()=>saveRecipe(r)} style={{background:saved?"#EDF6F1":C.accent,color:saved?"#3D6B50":"#FFF",border:"none",borderRadius:"8px",padding:"7px 11px",fontSize:"12px",fontWeight:"600",cursor:saved?"default":"pointer",flexShrink:0}}>
+                              {saved?"Saved ✓":"Save"}
+                            </button>
+                          )}
                         </div>
                       );
                     })}
