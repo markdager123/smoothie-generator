@@ -23,13 +23,16 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    /* ─── CREDENTIALS (hardcoded) ─── */
+    const ANTHROPIC_KEY = localStorage.getItem("sg-api-key") || "sk-ant-api03-nm3YkqZRSq4xT9OsritXfKYpy25NS5Omw2frlzv-FA46GUfj3anlK4qh0LwLjx_-JV5cbwAA";
+    const SB_URL        = "https://ivljukkwuttjdzxzygbt.supabase.co";
+    const SB_ANON_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2bGp1a2t3dXR0amR6eHp5Z2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjEyODUsImV4cCI6MjEwMDEzNzI4NX0.yBvPBobTsfjm6_JlG49dMjYKOzgKCKIAmMWq8i1JBV8";
+
     /* ─── SUPABASE CLIENT ─── */
     let _client = null;
     const getClient = () => {
       if (_client) return _client;
-      const url = localStorage.getItem("sg-sb-url");
-      const key = localStorage.getItem("sg-sb-key");
-      if (url && key) _client = supabase.createClient(url, key);
+      _client = supabase.createClient(SB_URL, SB_ANON_KEY);
       return _client;
     };
 
@@ -48,11 +51,6 @@
         } catch {}
       },
     };
-
-    const isReady = () =>
-      localStorage.getItem("sg-api-key") &&
-      localStorage.getItem("sg-sb-url") &&
-      localStorage.getItem("sg-sb-key");
 
     /* ─── DATABASE ─── */
     const DB = {
@@ -217,61 +215,7 @@ Rules:
       );
     }
 
-    /* ─── SETUP SCREEN ─── */
-    function SetupScreen({ onSave }) {
-      const [apiKey, setApiKey] = useState(localStorage.getItem("sg-api-key") || "");
-      const [sbUrl,  setSbUrl]  = useState(localStorage.getItem("sg-sb-url")  || "");
-      const [sbKey,  setSbKey]  = useState(localStorage.getItem("sg-sb-key")  || "");
-      const [err,    setErr]    = useState("");
-
-      const save = () => {
-        if (!apiKey.trim().startsWith("sk-")) { setErr("Anthropic key should start with sk-ant-…"); return; }
-        if (!sbUrl.trim().includes("supabase.co")) { setErr("Supabase URL should end in .supabase.co"); return; }
-        if (!sbKey.trim()) { setErr("Supabase anon key is required"); return; }
-        localStorage.setItem("sg-api-key", apiKey.trim());
-        localStorage.setItem("sg-sb-url",  sbUrl.trim());
-        localStorage.setItem("sg-sb-key",  sbKey.trim());
-        onSave();
-      };
-
-      const Field = ({ label, hint, value, onChange, placeholder }) => (
-        <div style={{ marginBottom: "16px" }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.8px", textTransform: "uppercase", color: C.dark, marginBottom: "4px" }}>{label}</div>
-          <input value={value} onChange={e => { onChange(e.target.value); setErr(""); }} placeholder={placeholder} type="password"
-            style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: "9px", padding: "11px 13px", fontSize: "14px", outline: "none", color: "#1A1A16" }} />
-          <div style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}>{hint}</div>
-        </div>
-      );
-
-      return (
-        <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-          <div style={{ background: C.card, borderRadius: "18px", padding: "28px 24px", maxWidth: "420px", width: "100%", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "26px", fontWeight: "700", color: C.dark, marginBottom: "6px" }}>Smoothie Generator</div>
-            <p style={{ fontSize: "13px", color: C.muted, lineHeight: 1.6, marginBottom: "24px" }}>Enter your credentials below. They're saved locally on this device and never sent anywhere except their respective services.</p>
-
-            <Field label="Anthropic API Key" placeholder="sk-ant-..."
-              hint="console.anthropic.com → API Keys → Create Key"
-              value={apiKey} onChange={setApiKey} />
-
-            <Field label="Supabase URL" placeholder="https://xxxx.supabase.co"
-              hint="supabase.com → your project → Settings → API → Project URL"
-              value={sbUrl} onChange={setSbUrl} />
-
-            <Field label="Supabase Anon Key" placeholder="eyJ..."
-              hint="Same page → anon public key"
-              value={sbKey} onChange={setSbKey} />
-
-            {err && <div style={{ color: C.accent, fontSize: "12px", marginBottom: "12px" }}>⚠️ {err}</div>}
-
-            <button onClick={save} style={{ width: "100%", background: C.dark, color: "#F8F4ED", border: "none", borderRadius: "10px", padding: "13px", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>
-              Save &amp; Start
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    /* ─── LOADING SCREEN ─── */
+        /* ─── LOADING SCREEN ─── */
     function LoadingScreen() {
       return (
         <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
@@ -285,7 +229,7 @@ Rules:
 
     /* ─── MAIN APP ─── */
     function SmoothieGenerator() {
-      const [setupDone,  setSetupDone]  = useState(isReady());
+      const [setupDone,  setSetupDone]  = useState(true);
       const [dbLoading,  setDbLoading]  = useState(true);
       const [tab,        setTab]        = useState("create");
       const [prompt,     setPrompt]     = useState("");
@@ -326,7 +270,7 @@ Rules:
         })();
       }, [setupDone]);
 
-      if (!setupDone) return <SetupScreen onSave={() => { _client = null; setSetupDone(true); }} />;
+
       if (dbLoading)  return <LoadingScreen />;
 
       const persist = async (key, val) => db.set(key, val);
@@ -352,7 +296,7 @@ Rules:
       const generate = async () => {
         if (loading) return;
         setLoading(true); setErr(null); setRecipe(null); setJustSaved(false);
-        const apiKey    = localStorage.getItem("sg-api-key");
+        const apiKey    = localStorage.getItem("sg-api-key") || ANTHROPIC_KEY;
         const histNames = hist.slice(-20).map(r => typeof r === "object" ? r.name : r);
         const histStr   = histNames.length ? histNames.map(n => `"${n}"`).join(", ") : "none";
         const msg = `${SYS}\n\n---\n\nAvailable ingredients:\n${buildList(off, custom)}\n\nPreviously made (do not repeat): ${histStr}\n\nRequest: ${prompt.trim() || "Surprise me with something creative and genuinely delicious"}`;
@@ -438,24 +382,19 @@ Rules:
             <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
               <div style={{ background: C.card, borderRadius: "16px", padding: "24px", width: "100%", maxWidth: "400px" }}>
                 <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", color: C.dark, marginBottom: "16px" }}>Settings</div>
-                {[
-                  ["Anthropic API Key", "sg-api-key", "sk-ant-..."],
-                  ["Supabase URL",      "sg-sb-url",  "https://xxxx.supabase.co"],
-                  ["Supabase Anon Key", "sg-sb-key",  "eyJ..."],
-                ].map(([label, storageKey, placeholder]) => (
-                  <div key={storageKey} style={{ marginBottom: "12px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: "600", color: C.muted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
-                    <input id={`setting-${storageKey}`} defaultValue={localStorage.getItem(storageKey) || ""} placeholder={placeholder} type="password"
-                      style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: "9px", padding: "9px 12px", fontSize: "14px", outline: "none", color: "#1A1A16" }} />
-                  </div>
-                ))}
+                <div style={{ fontSize: "13px", color: C.muted, marginBottom: "16px", lineHeight: 1.5 }}>
+                  Override the Anthropic API key if needed. Get one at <a href="https://console.anthropic.com" target="_blank" style={{ color: C.accent }}>console.anthropic.com</a>.
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "600", color: C.muted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Anthropic API Key</div>
+                  <input id="setting-sg-api-key" defaultValue={localStorage.getItem("sg-api-key") || ANTHROPIC_KEY} placeholder="sk-ant-..."
+                    autoCorrect="off" autoCapitalize="none" autoComplete="off" spellCheck="false"
+                    style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: "9px", padding: "9px 12px", fontSize: "13px", outline: "none", color: "#1A1A16", fontFamily: "monospace" }} />
+                </div>
                 <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
                   <button onClick={() => {
-                    ["sg-api-key", "sg-sb-url", "sg-sb-key"].forEach(k => {
-                      const v = document.getElementById(`setting-${k}`)?.value.trim();
-                      if (v) localStorage.setItem(k, v);
-                    });
-                    _client = null;
+                    const v = document.getElementById("setting-sg-api-key")?.value.trim();
+                    if (v) localStorage.setItem("sg-api-key", v);
                     setShowSettings(false);
                   }} style={{ flex: 1, background: C.dark, color: "#F8F4ED", border: "none", borderRadius: "9px", padding: "11px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Save</button>
                   <button onClick={() => setShowSettings(false)} style={btnOutline}>Cancel</button>
