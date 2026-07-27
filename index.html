@@ -307,17 +307,15 @@ Rules:
                       </div>
                       <button onClick={()=>setCreateStep(2)} style={{background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"10px",padding:"10px 18px",fontSize:"14px",fontWeight:"600",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>Next →</button>
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"6px",alignItems:"start"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",alignItems:"start"}}>
                       <div style={{display:"flex",flexDirection:"column",gap:"6px",minWidth:0}}>
                         <IngColumn cat="Bases"/>
-                        <IngColumn cat="Vegetables"/>
-                      </div>
-                      <div style={{display:"flex",flexDirection:"column",gap:"6px",minWidth:0}}>
                         <IngColumn cat="Proteins"/>
                         <IngColumn cat="Nuts, Seeds & Sweeteners"/>
                       </div>
-                      <div style={{minWidth:0}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:"6px",minWidth:0}}>
                         <IngColumn cat="Fruits"/>
+                        <IngColumn cat="Vegetables"/>
                       </div>
                     </div>
                   </div>
