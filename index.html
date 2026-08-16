@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Smoothie Generator</title>
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -24,7 +23,6 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    const ANTHROPIC_KEY = localStorage.getItem("sg-api-key") || "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";
     const SB_URL        = "https://ivljukkwuttjdzxzygbt.supabase.co";
     const SB_ANON_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2bGp1a2t3dXR0amR6eHp5Z2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjEyODUsImV4cCI6MjEwMDEzNzI4NX0.yBvPBobTsfjm6_JlG49dMjYKOzgKCKIAmMWq8i1JBV8";
 
@@ -160,7 +158,6 @@ Rules:
       const [showAddIng,   setShowAddIng]   = useState(false);
       const [newIngName,   setNewIngName]   = useState("");
       const [newIngCat,    setNewIngCat]    = useState("Fruits");
-      const [showSettings, setShowSettings] = useState(false);
       const [histEditMode,  setHistEditMode]  = useState(false);
 
       useEffect(()=>{
@@ -186,15 +183,14 @@ Rules:
       const generate = async()=>{
         if(loading)return;
         setLoading(true); setErr(null); setRecipe(null); setJustSaved(false);
-        const apiKey=localStorage.getItem("sg-api-key")||ANTHROPIC_KEY;
         const histNames=hist.slice(-20).map(r=>typeof r==="object"?r.name:r);
         const histStr=histNames.length?histNames.map(n=>`"${n}"`).join(", "):"none";
         const msg=`${SYS}\n\n---\n\nAvailable ingredients:\n${buildList(off,custom)}\n\nPreviously made (do not repeat): ${histStr}\n\nRequest: ${prompt.trim()||"Surprise me"}`;
         try {
           let res;
-          try { res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:msg}]})}); }
+          try { res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:msg}]})}); }
           catch(e){ throw new Error(`Network: ${e.message}`); }
-          if(!res.ok){ const t=await res.text().catch(()=>""); if(res.status===401)throw new Error("Invalid API key — tap ⚙️"); throw new Error(`HTTP ${res.status}: ${t.slice(0,100)}`); }
+          if(!res.ok){ const t=await res.text().catch(()=>""); throw new Error(`HTTP ${res.status}: ${t.slice(0,100)}`); }
           let data; try{ data=await res.json(); }catch{ throw new Error("Response was not JSON"); }
           if(data.error)throw new Error(`API: ${data.error.message}`);
           const text=data.content?.find(b=>b.type==="text")?.text||"";
@@ -262,25 +258,9 @@ Rules:
       return (
         <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'DM Sans', sans-serif",color:"#1A1A16"}}>
 
-          {showSettings&&(
-            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
-              <div style={{background:C.card,borderRadius:"16px",padding:"24px",width:"100%",maxWidth:"400px"}}>
-                <div style={{fontFamily:"'Playfair Display', serif",fontSize:"20px",color:C.dark,marginBottom:"8px"}}>Settings</div>
-                <div style={{fontSize:"13px",color:C.muted,marginBottom:"14px"}}>Update your Anthropic API key if needed.</div>
-                <input id="setting-api-key" defaultValue={localStorage.getItem("sg-api-key")||ANTHROPIC_KEY} autoCorrect="off" autoCapitalize="none" autoComplete="off" spellCheck="false" type="text"
-                  style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"9px",padding:"10px 12px",fontSize:"11px",outline:"none",color:"#1A1A16",fontFamily:"monospace",marginBottom:"14px",letterSpacing:"0.3px"}}/>
-                <div style={{display:"flex",gap:"10px"}}>
-                  <button onClick={()=>{const v=document.getElementById("setting-api-key")?.value.trim();if(v)localStorage.setItem("sg-api-key",v);setShowSettings(false);}} style={{flex:1,background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"9px",padding:"11px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Save</button>
-                  <button onClick={()=>setShowSettings(false)} style={btnOutline}>Cancel</button>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div style={{background:C.dark,padding:"18px 20px 0"}}>
             <div style={{display:"flex",alignItems:"center"}}>
               <h1 style={{fontFamily:"'Playfair Display', serif",fontSize:"26px",fontWeight:"700",color:"#F8F4ED",margin:0,flex:1}}>Smoothie Generator</h1>
-              <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",color:C.light,fontSize:"20px",cursor:"pointer",padding:"4px 0 4px 8px"}}>⚙️</button>
             </div>
             <div style={{fontSize:"12px",color:C.light,marginTop:"2px"}}>{avCount} ingredients selected · {hist.length} made</div>
             <div style={{display:"flex",marginTop:"12px"}}>
