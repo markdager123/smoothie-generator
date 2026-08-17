@@ -21,7 +21,7 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     const SB_URL        = "https://ivljukkwuttjdzxzygbt.supabase.co";
     const SB_ANON_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2bGp1a2t3dXR0amR6eHp5Z2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjEyODUsImV4cCI6MjEwMDEzNzI4NX0.yBvPBobTsfjm6_JlG49dMjYKOzgKCKIAmMWq8i1JBV8";
@@ -36,7 +36,7 @@
     const DB = {
       "Bases":    [ { id:"coconut_milk", name:"Coconut Milk", emoji:"🥥" }, { id:"coconut_water", name:"Coconut Water", emoji:"💧" }, { id:"oat_milk", name:"Oat Milk", emoji:"🥛" } ],
       "Proteins": [ { id:"greek_yogurt", name:"Greek Yogurt", emoji:"🫙" }, { id:"choc_protein", name:"Chocolate Protein", emoji:"🍫" }, { id:"van_protein", name:"Vanilla Protein", emoji:"✨" } ],
-      "Fruits":   [ { id:"banana", name:"Banana", emoji:"🍌" }, { id:"avocado", name:"Avocado", emoji:"🥑" }, { id:"mixed_berries", name:"Mixed Berries", emoji:"🫐" }, { id:"blueberries", name:"Blueberries", emoji:"🔵" }, { id:"raspberries", name:"Raspberries", emoji:"🍇" }, { id:"strawberries", name:"Strawberries", emoji:"🍓" }, { id:"pineapple", name:"Pineapple", emoji:"🍍" }, { id:"mango", name:"Mango", emoji:"🥭" } ],
+      "Fruits":   [ { id:"banana", name:"Banana", emoji:"🍌" }, { id:"avocado", name:"Avocado", emoji:"🥑" }, { id:"mixed_berries", name:"Mixed Berries (frozen)", emoji:"🫐" }, { id:"blueberries", name:"Blueberries (frozen)", emoji:"🔵" }, { id:"raspberries", name:"Raspberries (frozen)", emoji:"🍇" }, { id:"strawberries", name:"Strawberries (frozen)", emoji:"🍓" }, { id:"pineapple", name:"Pineapple (frozen)", emoji:"🍍" }, { id:"mango", name:"Mango (frozen)", emoji:"🥭" } ],
       "Vegetables": [ { id:"spinach", name:"Spinach", emoji:"🌿" }, { id:"kale", name:"Kale", emoji:"🥬" }, { id:"carrots", name:"Carrots", emoji:"🥕" } ],
       "Nuts, Seeds & Sweeteners": [ { id:"peanut_butter", name:"Peanut Butter", emoji:"🥜" }, { id:"almond_butter", name:"Almond Butter", emoji:"🌰" }, { id:"chia_seeds", name:"Chia Seeds", emoji:"⚫" }, { id:"flaxseed", name:"Flaxseed", emoji:"🟤" }, { id:"honey", name:"Honey", emoji:"🍯" } ],
       "Spices":   [ { id:"ginger", name:"Ginger", emoji:"🫚" }, { id:"cinnamon", name:"Cinnamon", emoji:"🟫" }, { id:"turmeric", name:"Turmeric", emoji:"🟡" }, { id:"cardamom", name:"Cardamom", emoji:"🌿" }, { id:"nutmeg", name:"Nutmeg", emoji:"🌰" }, { id:"cayenne", name:"Cayenne", emoji:"🌶️" }, { id:"black_pepper", name:"Black Pepper", emoji:"⚫" }, { id:"vanilla_ext", name:"Vanilla Extract", emoji:"🤍" }, { id:"cloves", name:"Cloves", emoji:"🫙" }, { id:"allspice", name:"Allspice", emoji:"🟤" } ],
@@ -64,7 +64,7 @@
         return avail.length ? `${cat}: ${avail.map(i=>i.name).join(", ")}` : null;
       }).filter(Boolean).join("\n");
 
-    const SYS = `You are a smoothie recipe generator. Use ONLY ingredients from the provided list.
+    const SYS = `You are a smoothie recipe generator with the palate of someone who has read hundreds of smoothie recipes on food blogs. Use ONLY ingredients from the provided list.
 Return ONLY valid JSON — no markdown, no extra text:
 {
   "name": "2-4 word name",
@@ -81,8 +81,10 @@ Return ONLY valid JSON — no markdown, no extra text:
 }
 Rules:
 - bases=liquids; proteins=protein powder/yogurt; fruits=all fruit; vegetables=all veg; nuts_seeds_sweeteners=nut butters+seeds+honey; spices=optional
-- proteins MUST always include Chocolate Protein, Vanilla Protein, or Greek Yogurt
-- vegetables and nuts_seeds_sweeteners may be empty arrays [] if not used
+- proteins MUST always include Chocolate Protein or Vanilla Protein — a protein powder is non-negotiable, every recipe needs one. On top of that, include Greek Yogurt too in most recipes (aim for roughly 2 out of every 3) since it's a favorite — but it's fine for some recipes to be powder-only.
+- vegetables and nuts_seeds_sweeteners may be empty arrays [] if not used — most recipes should skip at least one whole category
+- Vary the shape of each recipe the way a real recipe blog would: sometimes one dominant fruit, sometimes three or four combined; most recipes have no spice, some have one or two; the base liquid is sometimes a single ingredient. Do NOT default to "one of each category" every time — that formula gets repetitive and should be the exception, not the rule
+- Draw on the range of real smoothie archetypes food blogs cover — green/veggie-forward blends, tropical fruit combos, chocolate-peanut-butter styles, spiced/golden-milk styles, berry-and-yogurt classics, lassi-inspired blends, thick bowl-style blends — and let the request and available ingredients decide which direction fits, rather than repeating the same shape every time
 - icons: 3 emojis that best represent the most distinctive flavors/ingredients in this specific recipe
 - needsIce: true if little or no frozen fruit — won't be cold or thick enough without it
 - Ratios are relative within each category. Do NOT repeat smoothies from history. Make it taste good.`;
@@ -107,7 +109,7 @@ Rules:
       );
     }
 
-    function RecipeCard({ r, onSave, saveLabel="Save to Favorites", onRegenerate, onDelete }) {
+    function RecipeCard({ r, onSave, saveLabel="Save to Favorites", onRegenerate, onDelete, onEditNote }) {
       // backward compat with old recipe format
       const bases  = r.bases  || r.base  || [];
       const fruits = r.fruits || [];
@@ -117,6 +119,7 @@ Rules:
       const spices = r.spices || [];
       return (
         <div>
+          {r.note&&<div style={{background:"#FFF4DE",borderRadius:"8px",padding:"10px 13px",fontSize:"13px",color:"#7A5416",marginBottom:"14px",lineHeight:1.5,fontStyle:"italic"}}>📝 {r.note}</div>}
           <div style={{fontFamily:"'Playfair Display', serif",fontSize:"24px",fontWeight:"700",color:C.dark,lineHeight:1.2}}>{r.name}</div>
           <div style={{fontSize:"13px",color:C.muted,marginTop:"4px"}}>{r.tagline}</div>
           {r.needsIce&&<div style={{display:"flex",alignItems:"center",gap:"9px",background:C.ice,borderRadius:"9px",padding:"9px 13px",fontSize:"13px",color:C.iceText,marginTop:"12px",fontWeight:"500"}}><span style={{fontSize:"18px",flexShrink:0}}>🧊</span><span>Add ~1 cup of ice — not much frozen fruit in this one.</span></div>}
@@ -130,7 +133,26 @@ Rules:
           <div style={{display:"flex",gap:"10px",marginTop:"16px",flexWrap:"wrap"}}>
             {onSave&&<button onClick={onSave} style={{flex:1,minWidth:"120px",background:saveLabel.includes("✓")?C.dark:C.accent,color:"#FFF",border:"none",borderRadius:"10px",padding:"11px 16px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>{saveLabel}</button>}
             {onRegenerate&&<button onClick={onRegenerate} style={{background:"transparent",color:C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"10px",padding:"11px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Regenerate</button>}
+            {onEditNote&&<button onClick={onEditNote} style={{background:"transparent",color:C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"10px",padding:"11px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>{r.note?"Edit note":"Add note"}</button>}
             {onDelete&&<button onClick={onDelete} style={{background:"#7B1A1A",color:"#FFF",border:"none",borderRadius:"10px",padding:"8px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Remove</button>}
+          </div>
+        </div>
+      );
+    }
+
+    function NoteModal({ title, subtitle, initialValue, onCancel, onConfirm }) {
+      const [text, setText] = useState(initialValue || "");
+      return (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+          <div style={{background:C.card,borderRadius:"16px",padding:"24px",width:"100%",maxWidth:"400px"}}>
+            <div style={{fontFamily:"'Playfair Display', serif",fontSize:"20px",color:C.dark,marginBottom:"6px"}}>{title}</div>
+            {subtitle&&<div style={{fontSize:"13px",color:C.muted,marginBottom:"14px"}}>{subtitle}</div>}
+            <textarea autoFocus value={text} onChange={e=>setText(e.target.value)} rows={4} placeholder="e.g. add more ginger next time…"
+              style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"11px 13px",fontSize:"14px",color:"#1A1A16",resize:"none",outline:"none",lineHeight:1.5,marginBottom:"14px"}}/>
+            <div style={{display:"flex",gap:"10px"}}>
+              <button onClick={()=>onConfirm(text.trim())} style={{flex:1,background:C.dark,color:"#F8F4ED",border:"none",borderRadius:"9px",padding:"11px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Save</button>
+              <button onClick={onCancel} style={{background:"transparent",color:C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"9px",padding:"11px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"}}>Cancel</button>
+            </div>
           </div>
         </div>
       );
@@ -159,14 +181,20 @@ Rules:
       const [newIngName,   setNewIngName]   = useState("");
       const [newIngCat,    setNewIngCat]    = useState("Fruits");
       const [histEditMode,  setHistEditMode]  = useState(false);
+      const [saveModal,     setSaveModal]     = useState(null);   // recipe pending a "save to favorites" note prompt
+      const [noteEditTarget,setNoteEditTarget]= useState(null);   // favorite recipe being annotated
+      const [appNotes,      setAppNotes]      = useState("");
+      const [notesSavedFlash,setNotesSavedFlash]=useState(false);
+      const notesTimer = useRef(null);
 
       useEffect(()=>{
         (async()=>{
-          const [lFavs,lHist,lOff,lCustom]=await Promise.all([db.get("sl-favs"),db.get("sl-hist-v2"),db.get("sl-off"),db.get("sl-custom")]);
+          const [lFavs,lHist,lOff,lCustom,lNotes]=await Promise.all([db.get("sl-favs"),db.get("sl-hist-v2"),db.get("sl-off"),db.get("sl-custom"),db.get("sl-notes")]);
           if(lFavs)   setFavs(lFavs);
           if(lHist)   setHist(lHist);
           if(lOff)    setOff(lOff);
           if(lCustom) setCustom(lCustom);
+          if(lNotes)  setAppNotes(lNotes);
           setDbLoading(false);
         })();
       },[]);
@@ -205,13 +233,25 @@ Rules:
       };
 
       const isSaved=(r)=>r&&favs.some(f=>f.name===r.name);
-      const saveRecipe=async(r,withFeedback=false)=>{
+      const saveRecipe=async(r,note="",withFeedback=false)=>{
         if(!r||isSaved(r)){ if(withFeedback){setJustSaved(true);setTimeout(()=>setJustSaved(false),2200);} return; }
-        const next=[...favs,{...r,savedAt:Date.now()}];
+        const trimmedNote=(note||"").trim();
+        const next=[...favs,{...r,savedAt:Date.now(),...(trimmedNote?{note:trimmedNote}:{})}];
         setFavs(next); await persist("sl-favs",next);
         if(withFeedback){setJustSaved(true);setTimeout(()=>setJustSaved(false),2200);}
       };
       const delFav=async(name)=>{ const next=favs.filter(f=>f.name!==name); setFavs(next); await persist("sl-favs",next); if(viewing?.name===name)setViewing(null); };
+      const updateFavNote=async(name,note)=>{
+        const trimmedNote=(note||"").trim();
+        const next=favs.map(f=>f.name===name?(trimmedNote?{...f,note:trimmedNote}:(()=>{const {note:_,...rest}=f;return rest;})()):f);
+        setFavs(next); await persist("sl-favs",next);
+        setViewing(v=>v&&v.name===name?next.find(f=>f.name===name):v);
+      };
+      const onChangeAppNotes=(val)=>{
+        setAppNotes(val);
+        if(notesTimer.current)clearTimeout(notesTimer.current);
+        notesTimer.current=setTimeout(async()=>{ await persist("sl-notes",val); setNotesSavedFlash(true); setTimeout(()=>setNotesSavedFlash(false),1500); },600);
+      };
       const deleteHistEntry=async(generatedAt)=>{
         const next=hist.filter(r=>typeof r==="object"&&r.generatedAt!==generatedAt);
         setHist(next); await persist("sl-hist-v2",next);
@@ -232,7 +272,8 @@ Rules:
         {id:"create",    label:"Create"},
         {id:"pantry",    label:"Pantry"},
         {id:"favorites", label:favs.length?`Favorites (${favs.length})`:"Favorites"},
-        {id:"history",   label:hist.length?`History (${hist.length})`:"History"},
+        {id:"history",   label:"History"},
+        {id:"settings",  label:"Settings"},
       ];
       const btnOutline={background:"transparent",color:C.dark,border:`1.5px solid ${C.dark}`,borderRadius:"9px",padding:"8px 14px",fontSize:"13px",fontWeight:"600",cursor:"pointer"};
 
@@ -258,11 +299,22 @@ Rules:
       return (
         <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'DM Sans', sans-serif",color:"#1A1A16"}}>
 
+          {saveModal&&(
+            <NoteModal title="Save to Favorites" subtitle="Add a note? (optional)" initialValue=""
+              onCancel={()=>setSaveModal(null)}
+              onConfirm={async(note)=>{ const r=saveModal; setSaveModal(null); await saveRecipe(r,note,true); }}/>
+          )}
+          {noteEditTarget&&(
+            <NoteModal title={noteEditTarget.note?"Edit Note":"Add Note"} subtitle={noteEditTarget.name} initialValue={noteEditTarget.note||""}
+              onCancel={()=>setNoteEditTarget(null)}
+              onConfirm={async(note)=>{ const name=noteEditTarget.name; setNoteEditTarget(null); await updateFavNote(name,note); }}/>
+          )}
+
           <div style={{background:C.dark,padding:"18px 20px 0"}}>
             <div style={{display:"flex",alignItems:"center"}}>
               <h1 style={{fontFamily:"'Playfair Display', serif",fontSize:"26px",fontWeight:"700",color:"#F8F4ED",margin:0,flex:1}}>Smoothie Generator</h1>
             </div>
-            <div style={{fontSize:"12px",color:C.light,marginTop:"2px"}}>{avCount} ingredients selected · {hist.length} made</div>
+            <div style={{fontSize:"12px",color:C.light,marginTop:"2px"}}>{avCount} ingredients selected · {favs.length} favorites</div>
             <div style={{display:"flex",marginTop:"12px"}}>
               {TABS.map(({id,label})=>(
                 <button key={id} onClick={()=>{setTab(id);setViewing(null);if(id==="create")setCreateStep(1);}}
@@ -311,7 +363,7 @@ Rules:
                           <button onClick={()=>{setRecipe(null);setErr(null);}} style={{...btnOutline,fontSize:"12px"}}>New search</button>
                         </div>
                         <div style={{background:C.card,borderRadius:"14px",padding:"20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-                          <RecipeCard r={recipe} onSave={()=>saveRecipe(recipe,true)} saveLabel={justSaved?"Saved ✓":"Save to Favorites"} onRegenerate={generate}/>
+                          <RecipeCard r={recipe} onSave={()=>setSaveModal(recipe)} saveLabel={justSaved?"Saved ✓":"Save to Favorites"} onRegenerate={generate}/>
                         </div>
                       </div>
                     ):(
@@ -387,7 +439,7 @@ Rules:
                   <>
                     <button onClick={()=>setViewing(null)} style={{...btnOutline,marginBottom:"14px"}}>← Back</button>
                     <div style={{background:C.card,borderRadius:"14px",padding:"20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-                      <RecipeCard r={viewing} onDelete={()=>delFav(viewing.name)}/>
+                      <RecipeCard r={viewing} onDelete={()=>delFav(viewing.name)} onEditNote={()=>setNoteEditTarget(viewing)}/>
                     </div>
                   </>
                 ):favs.length===0?(
@@ -432,7 +484,7 @@ Rules:
                   <>
                     <button onClick={()=>setViewing(null)} style={{...btnOutline,marginBottom:"14px"}}>← Back</button>
                     <div style={{background:C.card,borderRadius:"14px",padding:"20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-                      <RecipeCard r={viewing} onSave={!isSaved(viewing)?()=>saveRecipe(viewing):undefined} saveLabel={isSaved(viewing)?"Saved ✓":"Save to Favorites"}/>
+                      <RecipeCard r={viewing} onSave={!isSaved(viewing)?()=>setSaveModal(viewing):undefined} saveLabel={isSaved(viewing)?"Saved ✓":"Save to Favorites"}/>
                     </div>
                   </>
                 ):hist.length===0?(
@@ -462,7 +514,7 @@ Rules:
                             {r.generatedAt&&<div style={{fontSize:"11px",color:"#B0A89A"}}>{fmtDate(r.generatedAt)}</div>}
                           </div>
                           {!histEditMode&&(
-                            <button onClick={()=>saveRecipe(r)} style={{background:saved?"#EDF6F1":C.accent,color:saved?"#3D6B50":"#FFF",border:"none",borderRadius:"8px",padding:"7px 11px",fontSize:"12px",fontWeight:"600",cursor:saved?"default":"pointer",flexShrink:0}}>
+                            <button onClick={()=>{if(!saved)setSaveModal(r);}} style={{background:saved?"#EDF6F1":C.accent,color:saved?"#3D6B50":"#FFF",border:"none",borderRadius:"8px",padding:"7px 11px",fontSize:"12px",fontWeight:"600",cursor:saved?"default":"pointer",flexShrink:0}}>
                               {saved?"Saved ✓":"Save"}
                             </button>
                           )}
@@ -471,6 +523,21 @@ Rules:
                     })}
                   </>
                 )}
+              </div>
+            )}
+
+            {/* ── SETTINGS ── */}
+            {tab==="settings"&&(
+              <div>
+                <div style={{background:C.card,borderRadius:"14px",padding:"18px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}}>
+                    <div style={{fontFamily:"'Playfair Display', serif",fontSize:"18px",fontWeight:"700",color:C.dark}}>Changes to make to app</div>
+                    {notesSavedFlash&&<span style={{fontSize:"11px",color:"#3D6B50",fontWeight:"600"}}>Saved ✓</span>}
+                  </div>
+                  <div style={{fontSize:"12px",color:C.muted,marginBottom:"12px"}}>Freeform notes — saves automatically as you type.</div>
+                  <textarea value={appNotes} onChange={e=>onChangeAppNotes(e.target.value)} rows={12} placeholder="Jot down ideas, bugs, tweaks…"
+                    style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"11px 13px",fontSize:"14px",color:"#1A1A16",resize:"vertical",outline:"none",lineHeight:1.6}}/>
+                </div>
               </div>
             )}
 
