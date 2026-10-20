@@ -30,16 +30,20 @@
     const SB_URL        = "https://uhatnqbqzbtnsqscocdz.supabase.co";
     const SB_ANON_KEY   = "sb_publishable_4YFy0lXfRkvl6PTKdlfeLg_UZwGGtCR";
 
+    const SB_TABLE      = "Smoothie_smoothie_store";
+
     let _client = null;
     const getClient = () => { if (_client) return _client; _client = supabase.createClient(SB_URL, SB_ANON_KEY); return _client; };
+    // supabase-js returns errors instead of throwing, so check `error` explicitly and surface failures via a banner
+    let _onDbError = () => {};
     const db = {
-      get: async (key) => { try { const { data } = await getClient().from("smoothie_store").select("value").eq("key", key).maybeSingle(); return data?.value ?? null; } catch { return null; } },
-      set: async (key, val) => { try { await getClient().from("smoothie_store").upsert({ key, value: val, updated_at: new Date().toISOString() }, { onConflict: "key" }); } catch {} },
+      get: async (key) => { try { const { data, error } = await getClient().from(SB_TABLE).select("value").eq("key", key).maybeSingle(); if (error) throw error; return data?.value ?? null; } catch (e) { console.error("db.get failed:", key, e); _onDbError(e.message || "load failed"); return null; } },
+      set: async (key, val) => { try { const { error } = await getClient().from(SB_TABLE).upsert({ key, value: val, updated_at: new Date().toISOString() }, { onConflict: "key" }); if (error) throw error; } catch (e) { console.error("db.set failed:", key, e); _onDbError(e.message || "save failed"); } },
     };
 
     const DB = {
       "Bases":    [ { id:"coconut_milk", name:"Coconut Milk", emoji:"🥥" }, { id:"coconut_water", name:"Coconut Water", emoji:"💧" }, { id:"oat_milk", name:"Oat Milk", emoji:"🥛" } ],
-      "Proteins": [ { id:"greek_yogurt", name:"Greek Yogurt", emoji:"🫙" }, { id:"choc_protein", name:"Chocolate Protein", emoji:"🍫" }, { id:"van_protein", name:"Vanilla Protein", emoji:"✨" } ],
+      "Proteins": [ { id:"unflav_protein", name:"Unflavored Protein", emoji:"🥄" }, { id:"greek_yogurt", name:"Greek Yogurt", emoji:"🫙" }, { id:"choc_protein", name:"Chocolate Protein", emoji:"🍫" }, { id:"van_protein", name:"Vanilla Protein", emoji:"✨" } ],
       "Fruits":   [ { id:"banana", name:"Banana", emoji:"🍌" }, { id:"avocado", name:"Avocado", emoji:"🥑" }, { id:"mixed_berries", name:"Mixed Berries (frozen)", emoji:"🫐" }, { id:"blueberries", name:"Blueberries (frozen)", emoji:"🔵" }, { id:"raspberries", name:"Raspberries (frozen)", emoji:"🍇" }, { id:"strawberries", name:"Strawberries (frozen)", emoji:"🍓" }, { id:"pineapple", name:"Pineapple (frozen)", emoji:"🍍" }, { id:"mango", name:"Mango (frozen)", emoji:"🥭" } ],
       "Vegetables": [ { id:"spinach", name:"Spinach", emoji:"🌿" }, { id:"kale", name:"Kale", emoji:"🥬" }, { id:"carrots", name:"Carrots", emoji:"🥕" } ],
       "Nuts, Seeds & Sweeteners": [ { id:"peanut_butter", name:"Peanut Butter", emoji:"🥜" }, { id:"almond_butter", name:"Almond Butter", emoji:"🌰" }, { id:"chia_seeds", name:"Chia Seeds", emoji:"⚫" }, { id:"flaxseed", name:"Flaxseed", emoji:"🟤" }, { id:"honey", name:"Honey", emoji:"🍯" } ],
@@ -85,7 +89,7 @@ Return ONLY valid JSON — no markdown, no extra text:
 }
 Rules:
 - bases=liquids; proteins=protein powder/yogurt; fruits=all fruit; vegetables=all veg; nuts_seeds_sweeteners=nut butters+seeds+honey; spices=optional
-- proteins MUST always include Chocolate Protein or Vanilla Protein — a protein powder is non-negotiable, every recipe needs one. On top of that, include Greek Yogurt too in most recipes (aim for roughly 2 out of every 3) since it's a favorite — but it's fine for some recipes to be powder-only.
+- proteins MUST always include a protein powder (Unflavored Protein, Chocolate Protein, or Vanilla Protein — whichever are available) — non-negotiable, every recipe needs one. Pick the powder that suits the flavor profile: unflavored for fruit- or spice-forward recipes, chocolate or vanilla when they complement it. On top of that, include Greek Yogurt too in most recipes (aim for roughly 2 out of every 3) since it's a favorite — but it's fine for some recipes to be powder-only.
 - vegetables and nuts_seeds_sweeteners may be empty arrays [] if not used — most recipes should skip at least one whole category
 - Vary the shape of each recipe the way a real recipe blog would: sometimes one dominant fruit, sometimes three or four combined; most recipes have no spice, some have one or two; the base liquid is sometimes a single ingredient. Do NOT default to "one of each category" every time — that formula gets repetitive and should be the exception, not the rule
 - Draw on the range of real smoothie archetypes food blogs cover — green/veggie-forward blends, tropical fruit combos, chocolate-peanut-butter styles, spiced/golden-milk styles, berry-and-yogurt classics, lassi-inspired blends, thick bowl-style blends — and let the request and available ingredients decide which direction fits, rather than repeating the same shape every time
@@ -189,6 +193,8 @@ Rules:
       const [noteEditTarget,setNoteEditTarget]= useState(null);   // favorite recipe being annotated
       const [appNotes,      setAppNotes]      = useState("");
       const [notesSavedFlash,setNotesSavedFlash]=useState(false);
+      const [dbError,       setDbError]       = useState(null);
+      _onDbError = setDbError;
       const notesTimer = useRef(null);
 
       useEffect(()=>{
@@ -313,6 +319,8 @@ Rules:
               onCancel={()=>setNoteEditTarget(null)}
               onConfirm={async(note)=>{ const name=noteEditTarget.name; setNoteEditTarget(null); await updateFavNote(name,note); }}/>
           )}
+
+          {dbError&&<div style={{background:"#7B1A1A",color:"#FFF",fontSize:"12px",padding:"8px 16px",textAlign:"center",lineHeight:1.4}}>⚠️ Database problem — changes may not be saved ({dbError})</div>}
 
           <div style={{background:C.dark,padding:"18px 20px 0"}}>
             <div style={{display:"flex",alignItems:"center"}}>
